@@ -1,0 +1,33 @@
+name: Student Attendance CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository-check:
+    name: Check Project Documents
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify SAD document
+        run: test -f "Student_Attendance_SAD_FINAL_TEAM (4).pdf"
+
+      - name: Verify Test Plan
+        run: test -f "Student_Attendance_Test_Plan_FINAL_TEAM.pdf"
+
+      - name: Confirm workflow execution
+        run: echo "Student Attendance CI workflow executed successfully."
