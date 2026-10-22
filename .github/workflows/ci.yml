@@ -4,21 +4,20 @@ on:
   push:
     branches:
       - main
-
+      - 'feature/**'
   pull_request:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  repository-check:
-    name: Check Project Documents
+  # ── Job 1: Verify project documents ──────────────────────────────────────
+  check-documents:
+    name: Verify Project Documents
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +25,71 @@ jobs:
       - name: Verify SAD document
         run: test -f "Student_Attendance_SAD_FINAL_TEAM (4).pdf"
 
+      - name: Verify SRS document
+        run: test -f "Student_Attendance_SRS_FINAL_WITH_RTM_COMMENTS_TEAM.pdf"
+
       - name: Verify Test Plan
         run: test -f "Student_Attendance_Test_Plan_FINAL_TEAM.pdf"
 
-      - name: Confirm workflow execution
-        run: echo "Student Attendance CI workflow executed successfully."
+      - name: Confirm document check
+        run: echo "All required project documents are present."
+
+  # ── Job 2: Backend lint + unit tests (SAM-F-001) ─────────────────────────
+  backend-test:
+    name: Backend – Install & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package.json
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Run backend unit tests (TC-AUTH-01)
+        env:
+          JWT_SECRET: ci_test_secret_that_is_long_enough_for_hs256_min
+          JWT_EXPIRES_IN: 1h
+          DB_PASSWORD: ci_placeholder
+          NODE_ENV: test
+        run: npm test
+
+  # ── Job 3: Frontend lint + build ─────────────────────────────────────────
+  frontend-build:
+    name: Frontend – Install & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build React app
+        env:
+          CI: false
+        run: npm run build
+
+      - name: Confirm build artefact
+        run: test -d build && echo "React build successful."
