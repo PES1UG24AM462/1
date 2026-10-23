@@ -17,6 +17,7 @@ const cors = require('cors');
 
 const { testConnection } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
@@ -49,6 +50,9 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 // ─── Routes ─────────────────────────────────────────────────────────────────
 // SAM-F-001: POST /api/auth/login
 app.use('/api/auth', authRoutes);
+
+// SAM-F-002: role-gated endpoints (admin / faculty / student)
+app.use('/api', roleRoutes);
 
 // Health-check endpoint (CI and monitoring)
 app.get('/api/health', (_req, res) => {
