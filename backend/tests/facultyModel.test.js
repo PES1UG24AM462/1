@@ -75,3 +75,25 @@ test('class with no enrollments maps to an empty roster, while unassigned classe
   expect(emptyRoster.students).toEqual([]);
   expect(unassignedClass).toBeNull();
 });
+
+test('duplicate enrollment rows do not duplicate students in the roster', async () => {
+  const studentRow = {
+    class_id: 12,
+    course_id: 4,
+    course_code: 'CS301',
+    course_name: 'Database Systems',
+    section: 'A',
+    academic_yr: '2026-27',
+    student_id: 81,
+    usn: 'PES1UG24CS001',
+    full_name: 'Aarav Sharma',
+    department: 'Computer Science',
+    semester: 3,
+  };
+  pool.execute.mockResolvedValue([[studentRow, { ...studentRow }], []]);
+
+  const result = await facultyModel.getAssignedClassRoster(23, 12);
+
+  expect(result.students).toHaveLength(1);
+  expect(result.students[0].studentId).toBe(81);
+});
