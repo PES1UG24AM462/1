@@ -19,6 +19,7 @@ const { testConnection } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const facultyRoutes = require('./routes/facultyRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
@@ -56,6 +57,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api', roleRoutes);
 // SAM-F-003 / SAM-F-004: faculty class selection and enrolled roster
 app.use('/api/faculty', facultyRoutes);
+
+// SAM-F-005: mark attendance — POST /api/attendance
+app.use('/api/attendance', attendanceRoutes);
 
 // Health-check endpoint (CI and monitoring)
 app.get('/api/health', (_req, res) => {
