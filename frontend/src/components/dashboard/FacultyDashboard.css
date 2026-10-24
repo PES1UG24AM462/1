@@ -206,3 +206,103 @@
     padding: 1.1rem;
   }
 }
+
+/* ── SAM-F-005: Attendance marking styles ── */
+
+/* Quick-mark bar */
+.att-quick-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+  flex-wrap: wrap;
+}
+.att-quick-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+.att-quick-btn {
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.8rem;
+  transition: opacity 0.15s;
+}
+.att-quick-btn:hover { opacity: 0.85; }
+.att-quick-btn--present { background: #c6f6d5; color: #22543d; }
+.att-quick-btn--absent  { background: #fed7d7; color: #742a2a; }
+.att-quick-btn--late    { background: #fefcbf; color: #744210; }
+
+/* Summary chips */
+.att-summary {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.att-chip {
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+}
+.att-chip--present { background: #c6f6d5; color: #22543d; }
+.att-chip--absent  { background: #fed7d7; color: #742a2a; }
+.att-chip--late    { background: #fefcbf; color: #744210; }
+
+/* Row highlight by status */
+.att-row--present { background: #f0fff4; }
+.att-row--absent  { background: #fff5f5; }
+.att-row--late    { background: #fffff0; }
+
+/* Per-student status toggle */
+.att-status-group {
+  display: flex;
+  gap: 0.3rem;
+}
+.att-radio-hidden {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.att-status-btn {
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border: 1.5px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+.att-status-btn--present             { color: #22543d; border-color: #9ae6b4; background: #fff; }
+.att-status-btn--present.att-status-btn--active { background: #c6f6d5; border-color: #48bb78; }
+.att-status-btn--absent              { color: #742a2a; border-color: #fc8181; background: #fff; }
+.att-status-btn--absent.att-status-btn--active  { background: #fed7d7; border-color: #f56565; }
+.att-status-btn--late                { color: #744210; border-color: #f6e05e; background: #fff; }
+.att-status-btn--late.att-status-btn--active    { background: #fefcbf; border-color: #ecc94b; }
+.att-status-btn:hover { opacity: 0.85; }
+
+/* Submit row */
+.att-submit-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Success message */
+.faculty-message-success {
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+  border-radius: 6px;
+  color: #22543d;
+  font-size: 0.875rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+}

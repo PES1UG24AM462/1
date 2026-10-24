@@ -36,3 +36,41 @@ export async function getClassRoster(classId, date) {
     throw err;
   }
 }
+
+const ATTENDANCE_BASE = '/api/attendance';
+
+/**
+ * SAM-F-005 — Submit attendance records for a class session.
+ * @param {number} classId
+ * @param {string} date    - YYYY-MM-DD
+ * @param {Array}  records - [{ studentId, status }]
+ */
+export async function submitAttendance(classId, date, records) {
+  try {
+    const { data } = await axios.post(
+      ATTENDANCE_BASE,
+      { classId, date, records },
+      authConfig()
+    );
+    return data;
+  } catch (err) {
+    if (err.response) throw errorFromResponse(err, 'Unable to save attendance. Please try again.');
+    throw err;
+  }
+}
+
+/**
+ * Fetch existing attendance for a session (pre-fill when faculty revisit a date).
+ */
+export async function getSessionAttendance(classId, date) {
+  try {
+    const { data } = await axios.get(ATTENDANCE_BASE, {
+      ...authConfig(),
+      params: { classId, date },
+    });
+    return data;
+  } catch (err) {
+    if (err.response) throw errorFromResponse(err, 'Unable to load existing attendance.');
+    throw err;
+  }
+}

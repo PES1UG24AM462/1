@@ -1,9 +1,22 @@
+/**
+ * FacultyDashboard.js
+ *
+ * SAM-F-003 — Faculty selects an assigned class and attendance date.
+ * SAM-F-004 — System displays the enrolled student roster.
+ * SAM-F-005 — Faculty marks each student Present, Absent, or Late and saves.
+ *
+ * TC-ATT-02: After roster loads, faculty can set a status per student and submit.
+ * Statuses: Present | Absent | Late  (exactly as per SRS)
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as facultyService from '../../services/facultyService';
 import { isValidAttendanceDate } from '../../utils/attendanceDate';
 import './FacultyDashboard.css';
+
+const STATUSES = ['Present', 'Absent', 'Late'];
 
 function classLabel(item) {
   const section = item.section ? ` · Section ${item.section}` : '';
@@ -14,17 +27,29 @@ function classLabel(item) {
 function FacultyDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  // ── Class selection state (SAM-F-003) ────────────────────────────────────
   const [classes, setClasses] = useState([]);
   const [classesLoading, setClassesLoading] = useState(true);
   const [classesError, setClassesError] = useState('');
   const [selectedClassId, setSelectedClassId] = useState('');
   const [attendanceDate, setAttendanceDate] = useState('');
+  const [formError, setFormError] = useState('');
+
+  // ── Roster state (SAM-F-004) ─────────────────────────────────────────────
   const [roster, setRoster] = useState(null);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState('');
-  const [formError, setFormError] = useState('');
   const rosterRequestId = useRef(0);
 
+  // ── Attendance marking state (SAM-F-005) ─────────────────────────────────
+  // marks: { [studentId]: 'Present' | 'Absent' | 'Late' }
+  const [marks, setMarks] = useState({});
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
+
+  // ── Load assigned classes on mount ───────────────────────────────────────
   const loadClasses = useCallback(async () => {
     setClassesLoading(true);
     setClassesError('');
@@ -39,9 +64,7 @@ function FacultyDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    loadClasses();
-  }, [loadClasses]);
+  useEffect(() => { loadClasses(); }, [loadClasses]);
 
   function handleLogout() {
     logout();
@@ -54,40 +77,62 @@ function FacultyDashboard() {
     setRosterLoading(false);
     setRosterError('');
     setFormError('');
+    setMarks({});
+    setSubmitError('');
+    setSubmitSuccess('');
   }
 
-  function handleClassChange(event) {
-    setSelectedClassId(event.target.value);
+  function handleClassChange(e) {
+    setSelectedClassId(e.target.value);
     clearRoster();
   }
 
-  function handleDateChange(event) {
-    setAttendanceDate(event.target.value);
+  function handleDateChange(e) {
+    setAttendanceDate(e.target.value);
     clearRoster();
   }
 
-  async function handleSubmit(event) {
-    event?.preventDefault();
+  // ── Load roster + pre-fill existing attendance ───────────────────────────
+  async function handleSubmitRoster(e) {
+    e?.preventDefault();
     clearRoster();
 
-    if (!selectedClassId) {
-      setFormError('Select an assigned class to continue.');
-      return;
-    }
-    if (!attendanceDate) {
-      setFormError('Select an attendance date to continue.');
-      return;
-    }
-    if (!isValidAttendanceDate(attendanceDate)) {
-      setFormError('Enter a valid attendance date.');
-      return;
-    }
+    if (!selectedClassId) { setFormError('Select an assigned class to continue.'); return; }
+    if (!attendanceDate)  { setFormError('Select an attendance date to continue.'); return; }
+    if (!isValidAttendanceDate(attendanceDate)) { setFormError('Enter a valid attendance date.'); return; }
 
     setRosterLoading(true);
     const requestId = ++rosterRequestId.current;
+
     try {
-      const result = await facultyService.getClassRoster(selectedClassId, attendanceDate);
-      if (rosterRequestId.current === requestId) setRoster(result);
+      // Load roster and existing attendance in parallel
+      const [rosterResult, existingResult] = await Promise.allSettled([
+        facultyService.getClassRoster(selectedClassId, attendanceDate),
+        facultyService.getSessionAttendance(selectedClassId, attendanceDate),
+      ]);
+
+      if (rosterRequestId.current !== requestId) return;
+
+      if (rosterResult.status === 'rejected') {
+        setRosterError(rosterResult.reason?.message || 'Unable to load this class roster. Please try again.');
+        return;
+      }
+
+      const rosterData = rosterResult.value;
+      setRoster(rosterData);
+
+      // Pre-fill marks from existing records; default new students to 'Present'
+      const prefill = {};
+      const existingMap = {};
+      if (existingResult.status === 'fulfilled') {
+        (existingResult.value.attendance || []).forEach(({ studentId, status }) => {
+          existingMap[studentId] = status;
+        });
+      }
+      rosterData.students.forEach((s) => {
+        prefill[s.studentId] = existingMap[s.studentId] || 'Present';
+      });
+      setMarks(prefill);
     } catch (err) {
       if (rosterRequestId.current === requestId) {
         setRosterError(err.message || 'Unable to load this class roster. Please try again.');
@@ -97,20 +142,75 @@ function FacultyDashboard() {
     }
   }
 
+  // ── Handle per-student status change (SAM-F-005) ─────────────────────────
+  function handleMarkChange(studentId, status) {
+    setMarks((prev) => ({ ...prev, [studentId]: status }));
+    setSubmitError('');
+    setSubmitSuccess('');
+  }
+
+  // ── Quick-mark all students ───────────────────────────────────────────────
+  function markAll(status) {
+    const updated = {};
+    roster.students.forEach((s) => { updated[s.studentId] = status; });
+    setMarks(updated);
+    setSubmitError('');
+    setSubmitSuccess('');
+  }
+
+  // ── Submit attendance (SAM-F-005) ─────────────────────────────────────────
+  async function handleSaveAttendance(e) {
+    e.preventDefault();
+    setSubmitError('');
+    setSubmitSuccess('');
+
+    if (!roster || roster.students.length === 0) return;
+
+    // Build records array
+    const records = roster.students.map((s) => ({
+      studentId: s.studentId,
+      status: marks[s.studentId] || 'Absent',
+    }));
+
+    setSubmitLoading(true);
+    try {
+      const result = await facultyService.submitAttendance(
+        roster.class.classId,
+        roster.date,
+        records
+      );
+      setSubmitSuccess(`Attendance saved — ${result.savedCount} student(s) recorded.`);
+    } catch (err) {
+      setSubmitError(err.message || 'Unable to save attendance. Please try again.');
+    } finally {
+      setSubmitLoading(false);
+    }
+  }
+
+  // ── Count summary ─────────────────────────────────────────────────────────
+  function getSummary() {
+    const counts = { Present: 0, Absent: 0, Late: 0 };
+    Object.values(marks).forEach((s) => { if (counts[s] !== undefined) counts[s]++; });
+    return counts;
+  }
+
+  const summary = roster ? getSummary() : null;
+
   return (
     <main className="faculty-page">
+      {/* Header */}
       <header className="faculty-header">
         <div>
           <p className="faculty-eyebrow">Student Attendance Management System</p>
           <h1>Welcome, {user?.fullName || 'Faculty'}</h1>
-          <p className="faculty-subtitle">Choose an assigned class and attendance date to view its enrolled students.</p>
+          <p className="faculty-subtitle">Select a class and date to mark attendance.</p>
         </div>
         <button className="faculty-signout" type="button" onClick={handleLogout}>Sign out</button>
       </header>
 
+      {/* Class + Date selection (SAM-F-003) */}
       <section className="faculty-card" aria-labelledby="selection-title">
         <h2 id="selection-title">Select class and date</h2>
-
         {classesLoading ? (
           <p role="status">Loading your assigned classes…</p>
         ) : classesError ? (
@@ -121,7 +221,7 @@ function FacultyDashboard() {
         ) : classes.length === 0 ? (
           <p className="faculty-empty" role="status">No classes are currently assigned to your account.</p>
         ) : (
-          <form className="faculty-selection-form" onSubmit={handleSubmit} noValidate>
+          <form className="faculty-selection-form" onSubmit={handleSubmitRoster} noValidate>
             <div className="faculty-fields">
               <label className="faculty-field" htmlFor="assigned-class">
                 <span>Assigned class</span>
@@ -132,7 +232,6 @@ function FacultyDashboard() {
                   ))}
                 </select>
               </label>
-
               <label className="faculty-field" htmlFor="attendance-date">
                 <span>Attendance date</span>
                 <input
@@ -144,36 +243,33 @@ function FacultyDashboard() {
                 />
               </label>
             </div>
-
             {formError && <p className="faculty-message faculty-message-error" role="alert">{formError}</p>}
-
-            <button
-              className="faculty-primary-button"
-              type="submit"
-              disabled={rosterLoading}
-            >
-              {rosterLoading ? 'Loading roster…' : 'View enrolled students'}
+            <button className="faculty-primary-button" type="submit" disabled={rosterLoading}>
+              {rosterLoading ? 'Loading roster…' : 'Load roster'}
             </button>
           </form>
         )}
       </section>
 
+      {/* Loading / error states */}
       {rosterLoading && <p className="faculty-inline-status" role="status">Loading the enrolled student roster…</p>}
       {rosterError && (
         <div className="faculty-message faculty-message-error" role="alert">
           <p>{rosterError}</p>
-          <button type="button" className="faculty-secondary-button" onClick={() => handleSubmit()}>
-            Try again
-          </button>
+          <button type="button" className="faculty-secondary-button" onClick={() => handleSubmitRoster()}>Try again</button>
         </div>
       )}
 
+      {/* Attendance marking table (SAM-F-004 + SAM-F-005) */}
       {roster && (
         <section className="faculty-card faculty-roster" aria-labelledby="roster-title">
           <div className="faculty-roster-heading">
             <div>
-              <h2 id="roster-title">Enrolled students</h2>
-              <p>{roster.class.courseCode} — {roster.class.courseName}{roster.class.section ? ` · Section ${roster.class.section}` : ''}</p>
+              <h2 id="roster-title">Mark attendance</h2>
+              <p>
+                {roster.class.courseCode} — {roster.class.courseName}
+                {roster.class.section ? ` · Section ${roster.class.section}` : ''}
+              </p>
             </div>
             <p className="faculty-date-chip">{roster.date}</p>
           </div>
@@ -181,28 +277,103 @@ function FacultyDashboard() {
           {roster.students.length === 0 ? (
             <p className="faculty-empty" role="status">There are no students enrolled in this class.</p>
           ) : (
-            <div className="faculty-table-scroll">
-              <table className="faculty-student-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Student</th>
-                    <th scope="col">USN</th>
-                    <th scope="col">Department</th>
-                    <th scope="col">Semester</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roster.students.map((student) => (
-                    <tr key={student.studentId}>
-                      <td>{student.fullName || 'Name unavailable'}</td>
-                      <td>{student.usn}</td>
-                      <td>{student.department || '—'}</td>
-                      <td>{student.semester ?? '—'}</td>
+            <form onSubmit={handleSaveAttendance} noValidate>
+
+              {/* Quick-mark buttons */}
+              <div className="att-quick-mark" role="group" aria-label="Mark all students">
+                <span className="att-quick-label">Mark all:</span>
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`att-quick-btn att-quick-btn--${s.toLowerCase()}`}
+                    onClick={() => markAll(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Summary chips */}
+              {summary && (
+                <div className="att-summary" aria-live="polite">
+                  <span className="att-chip att-chip--present">Present: {summary.Present}</span>
+                  <span className="att-chip att-chip--absent">Absent: {summary.Absent}</span>
+                  <span className="att-chip att-chip--late">Late: {summary.Late}</span>
+                </div>
+              )}
+
+              {/* Student table */}
+              <div className="faculty-table-scroll">
+                <table className="faculty-student-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Student</th>
+                      <th scope="col">USN</th>
+                      <th scope="col">Department</th>
+                      <th scope="col">Sem</th>
+                      <th scope="col">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {roster.students.map((student, idx) => {
+                      const current = marks[student.studentId] || 'Present';
+                      return (
+                        <tr key={student.studentId} className={`att-row att-row--${current.toLowerCase()}`}>
+                          <td>{idx + 1}</td>
+                          <td>{student.fullName || 'Name unavailable'}</td>
+                          <td>{student.usn}</td>
+                          <td>{student.department || '—'}</td>
+                          <td>{student.semester ?? '—'}</td>
+                          <td>
+                            <div className="att-status-group" role="group" aria-label={`Status for ${student.fullName}`}>
+                              {STATUSES.map((s) => (
+                                <label
+                                  key={s}
+                                  className={`att-status-btn att-status-btn--${s.toLowerCase()} ${current === s ? 'att-status-btn--active' : ''}`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`status-${student.studentId}`}
+                                    value={s}
+                                    checked={current === s}
+                                    onChange={() => handleMarkChange(student.studentId, s)}
+                                    className="att-radio-hidden"
+                                  />
+                                  {s}
+                                </label>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Submit feedback */}
+              {submitError && (
+                <div className="faculty-message faculty-message-error" role="alert">{submitError}</div>
+              )}
+              {submitSuccess && (
+                <div className="faculty-message faculty-message-success" role="status">{submitSuccess}</div>
+              )}
+
+              {/* Save button */}
+              <div className="att-submit-row">
+                <button
+                  type="submit"
+                  className="faculty-primary-button"
+                  disabled={submitLoading}
+                  aria-busy={submitLoading}
+                >
+                  {submitLoading ? 'Saving…' : `Save attendance (${roster.students.length} students)`}
+                </button>
+              </div>
+
+            </form>
           )}
         </section>
       )}
