@@ -67,7 +67,7 @@ function FacultyDashboard() {
   }
 
   async function handleSubmit(event) {
-    event.preventDefault();
+    event?.preventDefault();
     clearRoster();
 
     if (!selectedClassId) {
@@ -159,7 +159,14 @@ function FacultyDashboard() {
       </section>
 
       {rosterLoading && <p className="faculty-inline-status" role="status">Loading the enrolled student roster…</p>}
-      {rosterError && <p className="faculty-message faculty-message-error" role="alert">{rosterError}</p>}
+      {rosterError && (
+        <div className="faculty-message faculty-message-error" role="alert">
+          <p>{rosterError}</p>
+          <button type="button" className="faculty-secondary-button" onClick={() => handleSubmit()}>
+            Try again
+          </button>
+        </div>
+      )}
 
       {roster && (
         <section className="faculty-card faculty-roster" aria-labelledby="roster-title">

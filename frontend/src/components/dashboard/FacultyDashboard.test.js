@@ -175,4 +175,12 @@ test('surfaces class and roster API errors without crashing', async () => {
     await Promise.resolve();
   });
   expect(container.textContent).toContain('Roster unavailable');
+  expect(container.querySelector('.faculty-message-error .faculty-secondary-button').textContent).toBe('Try again');
+
+  facultyService.getClassRoster.mockResolvedValueOnce(rosterFor(12, 'CS301', 81));
+  await act(async () => {
+    Simulate.click(container.querySelector('.faculty-message-error .faculty-secondary-button'));
+    await Promise.resolve();
+  });
+  expect(container.textContent).toContain('Student 81');
 });

@@ -43,15 +43,18 @@ async function getAssignedClassRoster(userId, classId) {
   if (rows.length === 0) return null;
 
   const first = rows[0];
-  const students = rows
-    .filter((row) => row.student_id !== null)
-    .map((row) => ({
+  const studentsById = new Map();
+  rows.forEach((row) => {
+    if (row.student_id === null || studentsById.has(row.student_id)) return;
+    studentsById.set(row.student_id, {
       studentId: row.student_id,
       usn: row.usn,
       fullName: row.full_name,
       department: row.department,
       semester: row.semester,
-    }));
+    });
+  });
+  const students = [...studentsById.values()];
 
   return {
     classId: first.class_id,
