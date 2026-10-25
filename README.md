@@ -115,6 +115,8 @@ Tests mock the database layer and run without a live MySQL instance.
 | SAM-SR-004 | Login success/failure recorded in audit log | ✅ Implemented |
 | SAM-NF-003 | HTTPS/TLS enforced (via Helmet + proxy) | ✅ Implemented |
 | SAM-F-002 | RBAC middleware for protected routes | ✅ Implemented |
+| SAM-F-003 | Faculty selects an assigned class and valid attendance date (TC-ATT-01) | ✅ Implemented |
+| SAM-F-004 | Display current enrolled roster for the selected assigned class (TC-ATT-01) | ✅ Implemented |
 
 ---
 
