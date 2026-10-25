@@ -50,12 +50,18 @@ async function submitAttendance(req, res) {
     return res.status(400).json({ message: 'At least one student attendance record is required.' });
   }
 
-  // Validate every record
+  // Validate every record and prevent duplicates in the same submission batch (SAM-F-006)
+  const seenStudentIds = new Set();
   for (const record of records) {
     const sid = Number(record.studentId);
     if (!Number.isInteger(sid) || sid <= 0) {
       return res.status(400).json({ message: 'Each record must have a valid studentId.' });
     }
+    if (seenStudentIds.has(sid)) {
+      return res.status(400).json({ message: `Duplicate student ID ${sid} in submission.` });
+    }
+    seenStudentIds.add(sid);
+
     if (!VALID_STATUSES.has(record.status)) {
       return res.status(400).json({
         message: `Invalid status "${record.status}". Must be Present, Absent, or Late.`,
@@ -110,6 +116,9 @@ async function submitAttendance(req, res) {
       savedCount,
     });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Duplicate attendance record detected for this session.' });
+    }
     console.error('[Attendance] Save failed:', err.message);
     return res.status(500).json({ message: 'Unable to save attendance. Please try again.' });
   }
