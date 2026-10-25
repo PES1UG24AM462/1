@@ -43,7 +43,12 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ message: 'Account is not active. Please sign in again.' });
     }
     // The role comes from the database, never from the token alone.
-    req.user = { userId: account.user_id, username: account.username, role: account.role };
+    req.user = {
+      userId: account.user_id,
+      username: account.username,
+      role: account.role,
+      fullName: account.full_name,
+    };
     return next();
   } catch (err) {
     console.error('[Auth] Account lookup failed:', err.message);
