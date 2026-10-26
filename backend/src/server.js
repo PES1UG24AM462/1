@@ -14,6 +14,8 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const compression = require('compression');
+const responseTime = require('./middleware/responseTime');
 
 const { testConnection } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
@@ -31,6 +33,10 @@ const PORT = parseInt(process.env.PORT, 10) || 5000;
 // Helmet sets secure HTTP headers (X-Content-Type-Options, HSTS, etc.)
 // This supports SAM-NF-003 / SAM-SR-001 (HTTPS/TLS enforcement at proxy level)
 app.use(helmet());
+
+// SAM-NF-001: measure every request and gzip responses to keep payloads small
+app.use(responseTime);
+app.use(compression());
 
 // CORS — restrict to the React dev server and production origin
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
