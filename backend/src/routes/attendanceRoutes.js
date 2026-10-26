@@ -13,7 +13,7 @@ const { submitAttendance, getSessionAttendance } = require('../controllers/atten
 
 const router = Router();
 
-// SAM-F-005: mark attendance for a class session
+// SAM-F-005 / SAM-F-007: mark a class session or correct identified existing rows.
 router.post('/', authenticate, authorise('faculty'), submitAttendance);
 
 // Pre-fill support: fetch existing attendance for a session

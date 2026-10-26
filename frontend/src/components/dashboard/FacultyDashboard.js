@@ -4,6 +4,7 @@
  * SAM-F-003 — Faculty selects an assigned class and attendance date.
  * SAM-F-004 — System displays the enrolled student roster.
  * SAM-F-005 — Faculty marks each student Present, Absent, or Late and saves.
+ * SAM-F-007 — Existing records are prefilled and corrections are submitted with their IDs.
  *
  * TC-ATT-02: After roster loads, faculty can set a status per student and submit.
  * Statuses: Present | Absent | Late  (exactly as per SRS)
@@ -45,6 +46,7 @@ function FacultyDashboard() {
   // ── Attendance marking state (SAM-F-005) ─────────────────────────────────
   // marks: { [studentId]: 'Present' | 'Absent' | 'Late' }
   const [marks, setMarks] = useState({});
+  const [existingAttendance, setExistingAttendance] = useState({});
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
@@ -78,6 +80,7 @@ function FacultyDashboard() {
     setRosterError('');
     setFormError('');
     setMarks({});
+    setExistingAttendance({});
     setSubmitError('');
     setSubmitSuccess('');
   }
@@ -125,14 +128,15 @@ function FacultyDashboard() {
       const prefill = {};
       const existingMap = {};
       if (existingResult.status === 'fulfilled') {
-        (existingResult.value.attendance || []).forEach(({ studentId, status }) => {
-          existingMap[studentId] = status;
+        (existingResult.value.attendance || []).forEach(({ attendanceId, studentId, status }) => {
+          existingMap[studentId] = { attendanceId, status };
         });
       }
       rosterData.students.forEach((s) => {
-        prefill[s.studentId] = existingMap[s.studentId] || 'Present';
+        prefill[s.studentId] = existingMap[s.studentId]?.status || 'Present';
       });
       setMarks(prefill);
+      setExistingAttendance(existingMap);
     } catch (err) {
       if (rosterRequestId.current === requestId) {
         setRosterError(err.message || 'Unable to load this class roster. Please try again.');
@@ -168,6 +172,9 @@ function FacultyDashboard() {
 
     // Build records array
     const records = roster.students.map((s) => ({
+      ...(existingAttendance[s.studentId]?.attendanceId && {
+        attendanceId: existingAttendance[s.studentId].attendanceId,
+      }),
       studentId: s.studentId,
       status: marks[s.studentId] || 'Absent',
     }));
@@ -179,7 +186,9 @@ function FacultyDashboard() {
         roster.date,
         records
       );
-      setSubmitSuccess(`Attendance saved — ${result.savedCount} student(s) recorded.`);
+      setSubmitSuccess(result.correctionCount
+        ? `Attendance saved — ${result.correctionCount} correction(s) recorded with audit timestamps.`
+        : `Attendance saved — ${result.savedCount} student(s) recorded.`);
     } catch (err) {
       setSubmitError(err.message || 'Unable to save attendance. Please try again.');
     } finally {
@@ -265,7 +274,9 @@ function FacultyDashboard() {
         <section className="faculty-card faculty-roster" aria-labelledby="roster-title">
           <div className="faculty-roster-heading">
             <div>
-              <h2 id="roster-title">Mark attendance</h2>
+              <h2 id="roster-title">
+                {Object.keys(existingAttendance).length ? 'Review or correct attendance' : 'Mark attendance'}
+              </h2>
               <p>
                 {roster.class.courseCode} — {roster.class.courseName}
                 {roster.class.section ? ` · Section ${roster.class.section}` : ''}
@@ -278,6 +289,12 @@ function FacultyDashboard() {
             <p className="faculty-empty" role="status">There are no students enrolled in this class.</p>
           ) : (
             <form onSubmit={handleSaveAttendance} noValidate>
+
+              {Object.keys(existingAttendance).length > 0 && (
+                <p className="faculty-inline-status" role="status">
+                  Existing attendance is loaded. Changed statuses are recorded with an audit timestamp.
+                </p>
+              )}
 
               {/* Quick-mark buttons */}
               <div className="att-quick-mark" role="group" aria-label="Mark all students">
