@@ -1,27 +1,35 @@
 /**
  * attendanceController.js
- * Handles attendance marking for SAM-F-005.
+ * Handles attendance marking and corrections for SAM-F-005 / SAM-F-007.
  *
  * Requirements:
  *   SAM-F-005 — Faculty marks each enrolled student Present, Absent, or Late.
  *   SAM-F-006 — Duplicate attendance for same (student, class, date) is prevented.
  *   SAM-SR-003 — Only authenticated faculty may save attendance (enforced by middleware).
- *   SAM-SR-004 — Every save action is written to the audit log.
+ *   SAM-F-016 / SAM-SR-005: Attendance corrections are written to the audit log in the transaction.
  *
- * Test case: TC-ATT-02
+ * Test cases: TC-ATT-02 and TC-ATT-04
  * API (SAD v1.0 §4.3): POST /api/attendance
  *   Request:  { classId, date, records: [{ studentId, status }] }
- *   Response: { message, savedCount }
+ *   Response: { message, savedCount, correctionCount, corrections[] }
  *   Errors:   400 Invalid data
  *             409 Duplicate attendance (status already saved, can be updated)
  */
 
 const attendanceModel = require('../models/attendanceModel');
 const facultyModel = require('../models/facultyModel');
-const auditModel = require('../models/auditModel');
 const { isValidAttendanceDate } = require('./facultyController');
 
 const VALID_STATUSES = new Set(['Present', 'Absent', 'Late']);
+
+function parsePositiveInteger(value) {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
 
 /**
  * submitAttendance
@@ -31,12 +39,11 @@ const VALID_STATUSES = new Set(['Present', 'Absent', 'Late']);
  * @access Faculty only (authenticate + authorise('faculty') applied in router)
  */
 async function submitAttendance(req, res) {
-  const { classId, date, records } = req.body;
+  const { classId, date, records } = req.body || {};
   const facultyUserId = req.user.userId;
 
   // ── Input validation ──────────────────────────────────────────────────────
-  const parsedClassId = Number.isInteger(Number(classId)) && Number(classId) > 0
-    ? Number(classId) : null;
+  const parsedClassId = parsePositiveInteger(classId);
 
   if (parsedClassId === null) {
     return res.status(400).json({ message: 'A valid class ID is required.' });
@@ -52,9 +59,14 @@ async function submitAttendance(req, res) {
 
   // Validate every record and prevent duplicates in the same submission batch (SAM-F-006)
   const seenStudentIds = new Set();
+  const validatedRecords = [];
   for (const record of records) {
-    const sid = Number(record.studentId);
-    if (!Number.isInteger(sid) || sid <= 0) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      return res.status(400).json({ message: 'Each record must be a valid attendance object.' });
+    }
+
+    const sid = parsePositiveInteger(record.studentId);
+    if (sid === null) {
       return res.status(400).json({ message: 'Each record must have a valid studentId.' });
     }
     if (seenStudentIds.has(sid)) {
@@ -62,11 +74,25 @@ async function submitAttendance(req, res) {
     }
     seenStudentIds.add(sid);
 
+    let attendanceId;
+    if (Object.prototype.hasOwnProperty.call(record, 'attendanceId')) {
+      attendanceId = parsePositiveInteger(record.attendanceId);
+      if (attendanceId === null) {
+        return res.status(400).json({ message: 'Each correction must have a valid attendanceId.' });
+      }
+    }
+
     if (!VALID_STATUSES.has(record.status)) {
       return res.status(400).json({
         message: `Invalid status "${record.status}". Must be Present, Absent, or Late.`,
       });
     }
+
+    validatedRecords.push({
+      ...(attendanceId !== undefined && { attendanceId }),
+      studentId: sid,
+      status: record.status,
+    });
   }
 
   // ── Authorization check: class must belong to this faculty member ─────────
@@ -78,8 +104,8 @@ async function submitAttendance(req, res) {
 
     // Verify every submitted studentId is actually enrolled in this class
     const enrolledIds = new Set(assignedClass.students.map((s) => s.studentId));
-    for (const record of records) {
-      if (!enrolledIds.has(Number(record.studentId))) {
+    for (const record of validatedRecords) {
+      if (!enrolledIds.has(record.studentId)) {
         return res.status(400).json({
           message: `Student ${record.studentId} is not enrolled in this class.`,
         });
@@ -92,30 +118,27 @@ async function submitAttendance(req, res) {
 
   // ── Save attendance records ───────────────────────────────────────────────
   try {
-    const savedCount = await attendanceModel.saveAttendanceRecords({
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
+      || req.socket.remoteAddress || 'unknown';
+    const result = await attendanceModel.saveAttendanceRecords({
       classId: parsedClassId,
       date,
       recordedBy: facultyUserId,
-      records,
-    });
-
-    // SAM-SR-004: audit the save action
-    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
-      || req.socket.remoteAddress || 'unknown';
-
-    await auditModel.logEvent({
       actor: req.user.username,
-      action: 'ATTENDANCE_SUBMIT',
-      target: `attendance/class/${parsedClassId}/date/${date}`,
       ipAddress: clientIp,
-      details: `${savedCount} records saved`,
+      records: validatedRecords,
     });
 
     return res.status(200).json({
       message: 'Attendance saved successfully.',
-      savedCount,
+      savedCount: result.savedCount,
+      correctionCount: result.corrections.length,
+      corrections: result.corrections,
     });
   } catch (err) {
+    if (err.code === 'ATTENDANCE_NOT_FOUND') {
+      return res.status(404).json({ message: 'Attendance record not found for this class session.' });
+    }
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Duplicate attendance record detected for this session.' });
     }
@@ -136,8 +159,7 @@ async function getSessionAttendance(req, res) {
   const { classId, date } = req.query;
   const facultyUserId = req.user.userId;
 
-  const parsedClassId = Number.isInteger(Number(classId)) && Number(classId) > 0
-    ? Number(classId) : null;
+  const parsedClassId = parsePositiveInteger(classId);
 
   if (parsedClassId === null) {
     return res.status(400).json({ message: 'A valid class ID is required.' });
