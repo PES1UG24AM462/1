@@ -118,6 +118,7 @@ Tests mock the database layer and run without a live MySQL instance.
 | SAM-F-003 | Faculty selects an assigned class and valid attendance date (TC-ATT-01) | ✅ Implemented |
 | SAM-F-004 | Display current enrolled roster for the selected assigned class (TC-ATT-01) | ✅ Implemented |
 | SAM-F-008 | Students view their own persisted attendance history by course and date (TC-STU-01; AC-SAM-F-008) | Implemented |
+| SAM-F-007 | Authorized faculty corrects an existing attendance row; correction is timestamped (TC-ATT-04) | Implemented |
 
 ---
 

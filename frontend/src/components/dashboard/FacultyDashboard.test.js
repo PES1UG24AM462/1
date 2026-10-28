@@ -13,6 +13,8 @@ jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('../../services/facultyService', () => ({
   getAssignedClasses: jest.fn(),
   getClassRoster: jest.fn(),
+  getSessionAttendance: jest.fn(),
+  submitAttendance: jest.fn(),
 }));
 
 const classList = [
@@ -57,6 +59,8 @@ beforeEach(() => {
   useAuth.mockReturnValue({ user: { fullName: 'Faculty User' }, logout: jest.fn() });
   facultyService.getAssignedClasses.mockResolvedValue({ classes: classList });
   facultyService.getClassRoster.mockResolvedValue(rosterFor(12, 'CS301', 81));
+  facultyService.getSessionAttendance.mockResolvedValue({ attendance: [] });
+  facultyService.submitAttendance.mockResolvedValue({ savedCount: 1, correctionCount: 0 });
 });
 
 afterEach(() => {
@@ -140,6 +144,36 @@ test('shows an empty state for a class with no enrolled students', async () => {
   expect(container.textContent).toContain('There are no students enrolled in this class');
 });
 
+test('pre-fills an existing attendance record and submits its identifier when correcting it', async () => {
+  facultyService.getSessionAttendance.mockResolvedValue({
+    attendance: [{ attendanceId: 901, studentId: 81, status: 'Absent' }],
+  });
+  facultyService.submitAttendance.mockResolvedValue({ savedCount: 1, correctionCount: 1 });
+  await renderDashboard();
+
+  changeValue(container.querySelector('#assigned-class'), '12');
+  changeValue(container.querySelector('#attendance-date'), '2026-10-23');
+  await act(async () => {
+    Simulate.submit(container.querySelector('form'));
+    await Promise.resolve();
+  });
+
+  expect(container.textContent).toContain('Review or correct attendance');
+  expect(container.textContent).toContain('Existing attendance is loaded');
+  const lateStatus = container.querySelector('input[name="status-81"][value="Late"]');
+  act(() => Simulate.change(lateStatus, { target: { checked: true } }));
+
+  await act(async () => {
+    Simulate.submit(container.querySelector('.faculty-roster form'));
+    await Promise.resolve();
+  });
+
+  expect(facultyService.submitAttendance).toHaveBeenCalledWith(12, '2026-10-23', [
+    { attendanceId: 901, studentId: 81, status: 'Late' },
+  ]);
+  expect(container.textContent).toContain('1 correction(s) recorded with audit timestamps');
+});
+
 test('requires class and date selections before requesting a roster', async () => {
   await renderDashboard();
   await act(async () => {
@@ -175,4 +209,12 @@ test('surfaces class and roster API errors without crashing', async () => {
     await Promise.resolve();
   });
   expect(container.textContent).toContain('Roster unavailable');
+  expect(container.querySelector('.faculty-message-error .faculty-secondary-button').textContent).toBe('Try again');
+
+  facultyService.getClassRoster.mockResolvedValueOnce(rosterFor(12, 'CS301', 81));
+  await act(async () => {
+    Simulate.click(container.querySelector('.faculty-message-error .faculty-secondary-button'));
+    await Promise.resolve();
+  });
+  expect(container.textContent).toContain('Student 81');
 });

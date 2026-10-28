@@ -1,10 +1,10 @@
 const { Router } = require('express');
-const { authenticate, authorise } = require('../middleware/authMiddleware');
+const { authorise } = require('../middleware/authMiddleware');
 const { getAttendanceHistory, getEnrolledCourses } = require('../controllers/studentController');
 
 const router = Router();
 
-router.get('/courses', authenticate, authorise('student'), getEnrolledCourses);
-router.get('/attendance/history', authenticate, authorise('student'), getAttendanceHistory);
+router.get('/courses', authorise('student'), getEnrolledCourses);
+router.get('/attendance/history', authorise('student'), getAttendanceHistory);
 
 module.exports = router;
