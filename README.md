@@ -117,6 +117,7 @@ Tests mock the database layer and run without a live MySQL instance.
 | SAM-F-002 | RBAC middleware for protected routes | ✅ Implemented |
 | SAM-F-003 | Faculty selects an assigned class and valid attendance date (TC-ATT-01) | ✅ Implemented |
 | SAM-F-004 | Display current enrolled roster for the selected assigned class (TC-ATT-01) | ✅ Implemented |
+| SAM-F-008 | Students view their own persisted attendance history by course and date (TC-STU-01; AC-SAM-F-008) | Implemented |
 
 ---
 
