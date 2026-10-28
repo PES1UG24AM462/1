@@ -20,6 +20,7 @@ const authRoutes = require('./routes/authRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const { authenticate } = require('./middleware/authMiddleware');
 const facultyRoutes = require('./routes/facultyRoutes');
+const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 
 const app = express();
@@ -55,6 +56,7 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 // SAM-F-001: POST /api/auth/login
 app.use('/api/auth', authRoutes);
 
+// SAM-F-002: role-gated endpoints (admin / faculty / student)
 // Health-check endpoint (CI and monitoring)
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'SAMS API', timestamp: new Date().toISOString() });
@@ -75,6 +77,9 @@ app.use('/api', roleRoutes);
 
 // SAM-F-003 / SAM-F-004: faculty class selection and enrolled roster
 app.use('/api/faculty', facultyRoutes);
+
+// SAM-F-008: student-only attendance history
+app.use('/api/student', studentRoutes);
 
 // SAM-F-005: mark attendance — POST /api/attendance
 app.use('/api/attendance', attendanceRoutes);
