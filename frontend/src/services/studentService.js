@@ -23,3 +23,13 @@ export function getAttendanceHistory(filters = {}) {
   if (filters.date) params.date = filters.date;
   return get('/api/student/attendance/history', params);
 }
+
+/**
+ * SAM-F-009 — Get attendance percentages per course for the logged-in student.
+ * @param {string|number} [courseId] - optional filter to one course
+ */
+export function getAttendancePercentages(courseId) {
+  const params = {};
+  if (courseId) params.courseId = courseId;
+  return get('/api/student/attendance/percentage', params);
+}

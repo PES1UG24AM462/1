@@ -65,3 +65,113 @@
   .student-filter-form { grid-template-columns: 1fr; }
   .student-card { padding: 1.1rem; }
 }
+
+/* ── SAM-F-009: Attendance Percentage styles ── */
+
+.pct-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Grid of course cards */
+.pct-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Individual course percentage card */
+.pct-card {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  background: #fff;
+  transition: box-shadow 0.15s;
+}
+.pct-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.pct-card--low  { border-color: #fc8181; background: #fff5f5; }
+.pct-card--ok   { border-color: #9ae6b4; }
+
+.pct-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.pct-code {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+.pct-name {
+  font-size: 0.85rem;
+  color: #4a5568;
+  margin-top: 0.15rem;
+}
+.pct-meta {
+  font-size: 0.78rem;
+  color: #718096;
+  margin-top: 0.15rem;
+}
+
+/* Percentage chip */
+.pct-chip {
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.3rem 0.8rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pct-chip--ok  { background: #c6f6d5; color: #22543d; }
+.pct-chip--low { background: #fed7d7; color: #742a2a; }
+
+/* Progress bar */
+.pct-bar-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 8px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+.pct-bar-fill {
+  background: #48bb78;
+  border-radius: 999px;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.pct-bar-fill--low { background: #f56565; }
+
+/* Breakdown stats */
+.pct-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+}
+.pct-stat {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.pct-stat--present { color: #276749; }
+.pct-stat--late    { color: #744210; }
+.pct-stat--absent  { color: #742a2a; }
+.pct-stat--total   { color: #4a5568; }
+
+/* Low attendance warning */
+.pct-warning {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #c53030;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .pct-grid { grid-template-columns: 1fr; }
+}
