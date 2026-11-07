@@ -158,4 +158,41 @@ async function getAttendanceForSession(classId, date) {
   return rows;
 }
 
-module.exports = { saveAttendanceRecords, getAttendanceForSession };
+/**
+ * getStudentsBelowThreshold
+ * Calculates attendance percentages and returns students below the threshold (SAM-F-010, TC-REP-02).
+ *
+ * @param {Object} params
+ * @param {number} params.classId
+ * @param {number} [params.threshold=75]
+ * @returns {Promise<Array>}
+ */
+async function getStudentsBelowThreshold({ classId, threshold = 75 }) {
+  const query = `
+    SELECT
+      s.student_id AS studentId,
+      s.usn,
+      u.full_name AS fullName,
+      c.class_id AS classId,
+      COUNT(a.attendance_id) AS totalSessions,
+      SUM(CASE WHEN a.status IN ('Present', 'Late') THEN 1 ELSE 0 END) AS attendedSessions,
+      ROUND((SUM(CASE WHEN a.status IN ('Present', 'Late') THEN 1 ELSE 0 END) / NULLIF(COUNT(a.attendance_id), 0)) * 100, 2) AS attendancePercentage
+    FROM enrollments e
+    JOIN students s ON s.student_id = e.student_id
+    JOIN users u ON u.user_id = s.user_id
+    JOIN classes c ON c.class_id = e.class_id
+    LEFT JOIN attendance a ON a.student_id = s.student_id AND a.class_id = c.class_id
+    WHERE c.class_id = ?
+    GROUP BY s.student_id, s.usn, u.full_name, c.class_id
+    HAVING attendancePercentage IS NOT NULL AND attendancePercentage < ?
+    ORDER BY attendancePercentage ASC, s.usn ASC
+  `;
+  const [rows] = await pool.execute(query, [classId, threshold]);
+  return rows.map((r) => ({
+    ...r,
+    attendancePercentage: Number(r.attendancePercentage),
+    isFlagged: true,
+  }));
+}
+
+module.exports = { saveAttendanceRecords, getAttendanceForSession, getStudentsBelowThreshold };
