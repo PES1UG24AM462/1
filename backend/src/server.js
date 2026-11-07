@@ -18,6 +18,7 @@ const cors = require('cors');
 const { testConnection } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const roleRoutes = require('./routes/roleRoutes');
+const userRoutes = require('./routes/userRoutes');
 const { authenticate } = require('./middleware/authMiddleware');
 const facultyRoutes = require('./routes/facultyRoutes');
 const studentRoutes = require('./routes/studentRoutes');
@@ -75,6 +76,9 @@ app.get('/api/me', (req, res) => {
 
 // SAM-F-002: role-gated endpoints (admin / faculty / student)
 app.use('/api', roleRoutes);
+
+// SAM-F-014: admin account management
+app.use('/api/admin/users', userRoutes);
 
 // SAM-F-003 / SAM-F-004: faculty class selection and enrolled roster
 app.use('/api/faculty', facultyRoutes);
