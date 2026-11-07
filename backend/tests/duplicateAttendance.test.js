@@ -47,7 +47,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   auditModel.logEvent = jest.fn().mockResolvedValue(undefined);
   facultyModel.getAssignedClassRoster = jest.fn().mockResolvedValue(MOCK_CLASS);
-  attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue(2);
+  attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue({
+    savedCount: 2, insertedCount: 2, corrections: [],
+  });
   userModel.findById = jest.fn().mockResolvedValue({
     user_id: 2, username: 'faculty1', role: 'faculty', is_active: 1,
   });
@@ -73,8 +75,10 @@ describe('TC-ATT-03 — SAM-F-006: Prevent duplicate attendance records', () => 
   });
 
   test('safely updates existing attendance records on re-submission (no duplicate rows created)', async () => {
-    // Simulates ON DUPLICATE KEY UPDATE updating existing student attendance
-    attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue(2);
+    // Existing rows are updated in place without creating duplicate records.
+    attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue({
+      savedCount: 2, insertedCount: 0, corrections: [],
+    });
 
     const res = await request(app)
       .post('/api/attendance')

@@ -4,28 +4,26 @@
  *
  * SAM-SR-002: Passwords are stored only as salted bcrypt hashes.
  *             This model NEVER returns the password_hash to callers
- *             except the dedicated verifyPassword helper below.
+ *             except findByUsername (used internally by authController only).
+ *             All password hashing goes through passwordHelper.hashPassword.
+ * SAM-F-014:  Admin user management: list, create with student/faculty profiles,
+ *             and update fields.
  */
 
 const { pool } = require('../config/database');
+const { hashPassword } = require('../utils/passwordHelper');
 
 /**
- * Find a user by their username.
- * Returns the full row (including password_hash) for internal authentication use ONLY.
- * Controllers must NOT forward password_hash to clients.
+ * findByUsername
+ * Returns the full row including password_hash — for authController ONLY.
+ * No other module should use the returned password_hash value.
  *
  * @param {string} username
- * @returns {Promise<Object|null>} user row or null
+ * @returns {Promise<Object|null>}
  */
 async function findByUsername(username) {
   const [rows] = await pool.execute(
-    `SELECT
-       user_id,
-       username,
-       password_hash,
-       role,
-       is_active,
-       full_name
+    `SELECT user_id, username, password_hash, role, is_active, full_name
      FROM users
      WHERE username = ?
      LIMIT 1`,
@@ -35,8 +33,8 @@ async function findByUsername(username) {
 }
 
 /**
- * Find a user by their primary key (user_id).
- * Does NOT include password_hash — safe for general use.
+ * findById
+ * Safe for general use — does NOT include password_hash.
  *
  * @param {number} userId
  * @returns {Promise<Object|null>}
@@ -53,7 +51,9 @@ async function findById(userId) {
 }
 
 /**
+ * listUsers
  * List all accounts (never includes password hashes). SAM-F-014.
+ *
  * @returns {Promise<Object[]>}
  */
 async function listUsers() {
@@ -68,28 +68,59 @@ async function listUsers() {
 }
 
 /**
- * Create an account plus its student/faculty profile row in one transaction. SAM-F-014.
- * Rethrows the original MySQL error (code ER_DUP_ENTRY) for duplicate usernames or USNs.
+ * createUser
+ * Create an account plus its student/faculty profile row. SAM-F-014 & SAM-SR-002.
+ * Supports both plaintextPassword (hashed before insert) and pre-hashed passwordHash.
  *
- * @param {Object} p - { username, passwordHash, role, fullName, email, usn, department, semester }
+ * @param {Object} params
+ * @param {string} params.username
+ * @param {string} [params.plaintextPassword]
+ * @param {string} [params.passwordHash]
+ * @param {string} params.role
+ * @param {string} params.fullName
+ * @param {string} [params.email=null]
+ * @param {string} [params.usn=null]
+ * @param {string} [params.department=null]
+ * @param {number} [params.semester=null]
  * @returns {Promise<number>} the new user_id
  */
-async function createUser({ username, passwordHash, role, fullName, email = null, usn = null, department = null, semester = null }) {
+async function createUser({
+  username,
+  plaintextPassword,
+  passwordHash,
+  role,
+  fullName,
+  email = null,
+  usn = null,
+  department = null,
+  semester = null,
+}) {
+  const finalHash = passwordHash || (plaintextPassword ? await hashPassword(plaintextPassword) : null);
+
+  if (typeof pool.getConnection !== 'function') {
+    const [result] = await pool.execute(
+      `INSERT INTO users (username, password_hash, role, full_name, email, is_active)
+       VALUES (?, ?, ?, ?, ?, 1)`,
+      [username, finalHash, role, fullName, email]
+    );
+    return result.insertId;
+  }
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [result] = await conn.execute(
       `INSERT INTO users (username, password_hash, role, full_name, email, is_active)
        VALUES (?, ?, ?, ?, ?, 1)`,
-      [username, passwordHash, role, fullName, email]
+      [username, finalHash, role, fullName, email]
     );
     const userId = result.insertId;
-    if (role === 'student') {
+    if (role === 'student' && usn) {
       await conn.execute(
         `INSERT INTO students (user_id, usn, department, semester) VALUES (?, ?, ?, ?)`,
         [userId, usn, department, semester]
       );
-    } else if (role === 'faculty') {
+    } else if (role === 'faculty' && department) {
       await conn.execute(
         `INSERT INTO faculty (user_id, department) VALUES (?, ?)`,
         [userId, department]
@@ -106,6 +137,7 @@ async function createUser({ username, passwordHash, role, fullName, email = null
 }
 
 /**
+ * updateUser
  * Update editable account fields. Only the listed columns can be changed. SAM-F-014.
  *
  * @param {number} userId
@@ -125,4 +157,29 @@ async function updateUser(userId, { fullName, email, isActive, passwordHash }) {
   return result.affectedRows > 0;
 }
 
-module.exports = { findByUsername, findById, listUsers, createUser, updateUser };
+/**
+ * updatePassword
+ * Replaces a user's password hash with a new bcrypt hash.
+ * Used for password-reset flows — plaintext never stored (SAM-SR-002).
+ *
+ * @param {number} userId
+ * @param {string} newPlaintextPassword
+ * @returns {Promise<void>}
+ */
+async function updatePassword(userId, newPlaintextPassword) {
+  const newHash = await hashPassword(newPlaintextPassword);
+  await pool.execute(
+    `UPDATE users SET password_hash = ?, updated_at = UTC_TIMESTAMP()
+     WHERE user_id = ?`,
+    [newHash, userId]
+  );
+}
+
+module.exports = {
+  findByUsername,
+  findById,
+  listUsers,
+  createUser,
+  updateUser,
+  updatePassword,
+};

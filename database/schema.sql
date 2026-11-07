@@ -103,7 +103,8 @@ CREATE TABLE IF NOT EXISTS enrollments (
 -- SAM-F-005: Status = Present | Absent | Late
 -- SAM-F-006: UNIQUE constraint on (student_id, class_id, attendance_date)
 --            prevents duplicate records for the same session.
--- SAM-F-007: edited_at and edited_by track corrections (audit trail).
+-- SAM-F-007: edited_at and edited_by track the latest correction; each correction is
+--            also appended to audit_log with previous/new status and a UTC timestamp.
 CREATE TABLE IF NOT EXISTS attendance (
   attendance_id   INT UNSIGNED NOT NULL AUTO_INCREMENT,
   student_id      INT UNSIGNED NOT NULL,

@@ -18,10 +18,29 @@ const { pool } = require('../config/database');
  * @param {string}      params.target    - resource or entity affected, e.g. 'users/42'
  * @param {string|null} params.ipAddress - client IP address for security events
  * @param {string|null} params.details   - optional JSON-serialisable detail string
+ * @param {Object}      params.connection - optional transaction connection
+ * @param {string|null} params.createdAt  - optional trusted UTC timestamp from the DB
  */
-async function logEvent({ actor = null, action, target, ipAddress = null, details = null }) {
+async function logEvent({
+  actor = null,
+  action,
+  target,
+  ipAddress = null,
+  details = null,
+  connection = pool,
+  createdAt = null,
+}) {
   // SAM-SR-002: never log plaintext passwords — callers must strip them before calling this.
-  await pool.execute(
+  if (createdAt) {
+    await connection.execute(
+      `INSERT INTO audit_log (actor, action, target, ip_address, details, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [actor, action, target, ipAddress, details, createdAt]
+    );
+    return;
+  }
+
+  await connection.execute(
     `INSERT INTO audit_log (actor, action, target, ip_address, details, created_at)
      VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())`,
     [actor, action, target, ipAddress, details]

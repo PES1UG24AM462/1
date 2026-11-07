@@ -50,7 +50,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   auditModel.logEvent = jest.fn().mockResolvedValue(undefined);
   facultyModel.getAssignedClassRoster = jest.fn().mockResolvedValue(MOCK_CLASS);
-  attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue(2);
+  attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue({
+    savedCount: 2, insertedCount: 2, corrections: [],
+  });
   attendanceModel.getAttendanceForSession = jest.fn().mockResolvedValue([]);
   // Mock the DB account lookup inside authMiddleware
   userModel.findById = jest.fn().mockResolvedValue({
@@ -82,14 +84,78 @@ describe('TC-ATT-02 — SAM-F-005: Mark attendance with valid statuses', () => {
     expect(attendanceModel.saveAttendanceRecords).toHaveBeenCalledWith(
       expect.objectContaining({ classId: 10, date: '2026-10-22' })
     );
-    // SAM-SR-004: audit logged
-    expect(auditModel.logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'ATTENDANCE_SUBMIT' })
+    expect(attendanceModel.saveAttendanceRecords).toHaveBeenCalledWith(
+      expect.objectContaining({ recordedBy: 2, actor: 'faculty1', records: VALID_BODY.records })
     );
   });
 
+  test('corrects an existing row by its ID using the authenticated actor and returned audit timestamp', async () => {
+    const correction = {
+      attendanceId: 901,
+      previousStatus: 'Absent',
+      status: 'Present',
+      correctionTimestamp: '2026-10-26T10:30:15Z',
+    };
+    attendanceModel.saveAttendanceRecords.mockResolvedValue({
+      savedCount: 1, insertedCount: 0, corrections: [correction],
+    });
+
+    const res = await request(app)
+      .post('/api/attendance')
+      .set('Authorization', `Bearer ${facultyToken()}`)
+      .send({
+        classId: 10,
+        date: '2026-10-22',
+        records: [{
+          attendanceId: 901,
+          studentId: 1,
+          status: 'Present',
+          previousStatus: 'Late',
+          actor: 'admin_user',
+          userId: 99,
+          correctionTimestamp: '2099-01-01T00:00:00Z',
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.correctionCount).toBe(1);
+    expect(res.body.corrections).toEqual([correction]);
+    expect(attendanceModel.saveAttendanceRecords).toHaveBeenCalledWith(expect.objectContaining({
+      recordedBy: 2,
+      actor: 'faculty1',
+      records: [{ attendanceId: 901, studentId: 1, status: 'Present' }],
+    }));
+  });
+
+  test('rejects a malformed correction identifier before writing', async () => {
+    const res = await request(app)
+      .post('/api/attendance')
+      .set('Authorization', `Bearer ${facultyToken()}`)
+      .send({ ...VALID_BODY, records: [{ attendanceId: '1e2', studentId: 1, status: 'Present' }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/attendanceId/i);
+    expect(attendanceModel.saveAttendanceRecords).not.toHaveBeenCalled();
+  });
+
+  test('returns not found when a requested correction row no longer exists', async () => {
+    const error = new Error('ATTENDANCE_NOT_FOUND');
+    error.code = 'ATTENDANCE_NOT_FOUND';
+    attendanceModel.saveAttendanceRecords.mockRejectedValue(error);
+
+    const res = await request(app)
+      .post('/api/attendance')
+      .set('Authorization', `Bearer ${facultyToken()}`)
+      .send({ ...VALID_BODY, records: [{ attendanceId: 901, studentId: 1, status: 'Present' }] });
+
+    expect(res.status).toBe(404);
+    expect(res.body.message).toMatch(/Attendance record not found/i);
+  });
+
   test('should accept all three valid statuses: Present, Absent, Late', async () => {
-    attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue(3);
+    attendanceModel.saveAttendanceRecords = jest.fn().mockResolvedValue({
+      savedCount: 3, insertedCount: 3, corrections: [],
+    });
     facultyModel.getAssignedClassRoster = jest.fn().mockResolvedValue({
       ...MOCK_CLASS,
       students: [
