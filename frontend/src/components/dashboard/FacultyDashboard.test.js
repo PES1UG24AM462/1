@@ -8,7 +8,7 @@ import FacultyDashboard from './FacultyDashboard';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock('react-router-dom', () => ({ useNavigate: jest.fn() }));
+jest.mock('react-router-dom', () => ({ useNavigate: jest.fn(), Link: ({ children }) => children }));
 jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('../../services/facultyService', () => ({
   getAssignedClasses: jest.fn(),

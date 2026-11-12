@@ -9,6 +9,7 @@
  */
 
 const { pool } = require('../config/database');
+const { attendanceThreshold } = require('../config/attendancePolicy');
 const auditModel = require('./auditModel');
 
 function correctionError(code) {
@@ -167,7 +168,7 @@ async function getAttendanceForSession(classId, date) {
  * @param {number} [params.threshold=75]
  * @returns {Promise<Array>}
  */
-async function getStudentsBelowThreshold({ classId, threshold = 75 }) {
+async function getStudentsBelowThreshold({ classId, threshold = attendanceThreshold }) {
   const query = `
     SELECT
       s.student_id AS studentId,

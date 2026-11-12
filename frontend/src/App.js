@@ -18,6 +18,7 @@ import LoginPage from './components/auth/LoginPage';
 import StudentDashboard from './components/dashboard/StudentDashboard';
 import FacultyDashboard from './components/dashboard/FacultyDashboard';
 import AdminDashboard from './components/dashboard/AdminDashboard';
+import AttendanceReportPage from './components/dashboard/AttendanceReportPage';
 
 /**
  * ProtectedRoute
@@ -69,6 +70,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports/attendance"
+        element={
+          <ProtectedRoute allowedRoles={['faculty', 'admin']}>
+            <AttendanceReportPage />
           </ProtectedRoute>
         }
       />
