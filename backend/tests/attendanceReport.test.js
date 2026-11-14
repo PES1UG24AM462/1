@@ -96,6 +96,7 @@ test('authorized faculty generates a correctly grouped date-range report from da
   expect(reportModel.getAttendanceRows).toHaveBeenCalledWith({
     classId: 10,
     courseId: 3,
+    studentId: null,
     from: filters.from,
     to: filters.to,
     userId: 2,
@@ -146,6 +147,44 @@ test('class/course mismatch or unauthorized faculty class returns a non-disclosi
   expect(response.body).not.toHaveProperty('students');
 });
 
+test('student filter is validated against class membership and applied with other filters', async () => {
+  reportModel.hasReportStudent.mockResolvedValue(true);
+  reportModel.getAttendanceRows.mockResolvedValue([row(2, 'Present', filters.from)]);
+  const response = await request(app)
+    .get('/api/reports/attendance')
+    .query({ ...filters, studentId: '2' })
+    .set('Authorization', `Bearer ${tokenFor(2, 'faculty')}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body.students).toHaveLength(1);
+  expect(response.body.students[0].studentId).toBe(2);
+  expect(reportModel.hasReportStudent).toHaveBeenCalledWith(10, 2, 3, 2, 'faculty');
+  expect(reportModel.getAttendanceRows).toHaveBeenCalledWith(expect.objectContaining({
+    classId: 10, courseId: 3, studentId: 2, from: filters.from, to: filters.to,
+  }));
+});
+
+test('rejects a student who is not associated with the selected class', async () => {
+  reportModel.hasReportStudent.mockResolvedValue(false);
+  const response = await request(app)
+    .get('/api/reports/attendance')
+    .query({ ...filters, studentId: '999' })
+    .set('Authorization', `Bearer ${tokenFor(2, 'faculty')}`);
+
+  expect(response.status).toBe(404);
+  expect(reportModel.getAttendanceRows).not.toHaveBeenCalled();
+});
+
+test('rejects malformed student IDs before querying the database', async () => {
+  const response = await request(app)
+    .get('/api/reports/attendance')
+    .query({ ...filters, studentId: '1.5' })
+    .set('Authorization', `Bearer ${tokenFor(2, 'faculty')}`);
+
+  expect(response.status).toBe(400);
+  expect(reportModel.hasReportStudent).not.toHaveBeenCalled();
+});
+
 test('student and unauthenticated users cannot access attendance reports', async () => {
   userModel.findById.mockResolvedValue({ user_id: 3, username: 'student1', role: 'student', is_active: 1 });
   const studentResponse = await request(app)
@@ -168,6 +207,18 @@ test('report class selection uses actual role-scoped database classes', async ()
   expect(response.status).toBe(200);
   expect(response.body.classes).toEqual([{ classId: 10, courseId: 3, courseCode: 'CS301' }]);
   expect(reportModel.listReportClasses).toHaveBeenCalledWith(2, 'faculty');
+});
+
+test('report students are listed only after the requested class passes the role-scoped class check', async () => {
+  reportModel.listReportClasses.mockResolvedValue([{ classId: 10, courseId: 3 }]);
+  reportModel.listReportStudents.mockResolvedValue([{ studentId: 2, studentNumber: 'PES2', fullName: 'Student 2' }]);
+  const response = await request(app)
+    .get('/api/reports/students?classId=10')
+    .set('Authorization', `Bearer ${tokenFor(2, 'faculty')}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body.students[0].studentId).toBe(2);
+  expect(reportModel.listReportStudents).toHaveBeenCalledWith(10, 2, 'faculty');
 });
 
 test('database failures return a generic report error without leaking database details', async () => {
