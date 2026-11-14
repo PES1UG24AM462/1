@@ -1,5 +1,5 @@
 /**
- * Reporting & analytics controller (SAM-F-010, SAM-F-011).
+ * Reporting & analytics controller (SAM-F-010, SAM-F-011, SAM-F-013).
  */
 
 const attendanceModel = require('../models/attendanceModel');
@@ -8,6 +8,7 @@ const attendanceReportService = require('../services/attendanceReportService');
 const facultyModel = require('../models/facultyModel');
 const auditModel = require('../models/auditModel');
 const { attendanceThreshold } = require('../config/attendancePolicy');
+const { reportToCsv, csvFilename } = require('../utils/csvHelper');
 
 function parsePositiveId(value) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -147,4 +148,88 @@ async function getLowAttendanceReport(req, res) {
   }
 }
 
-module.exports = { getReportClasses, getReportStudents, getAttendanceReport, getLowAttendanceReport, parsePositiveId };
+/**
+ * exportAttendanceCsv
+ * GET /api/reports/attendance/export
+ *
+ * SAM-F-013 — Export attendance report as CSV download.
+ * TC-REP-05  — Response headers set Content-Disposition: attachment
+ *              and Content-Type: text/csv so the browser triggers a download.
+ *
+ * Uses identical query params as getAttendanceReport so the UI can
+ * reuse the same filters: classId, courseId, from, to, studentId (optional).
+ *
+ * @route  GET /api/reports/attendance/export
+ * @access Faculty, Admin
+ */
+async function exportAttendanceCsv(req, res) {
+  const classId  = parsePositiveId(req.query.classId);
+  const courseId = parsePositiveId(req.query.courseId);
+  const studentId = req.query.studentId === undefined
+    ? null
+    : parsePositiveId(req.query.studentId);
+  const { from, to } = req.query;
+
+  if (classId === null || courseId === null ||
+      (req.query.studentId !== undefined && studentId === null)) {
+    return res.status(400).json({ message: 'Select a valid course and class.' });
+  }
+  if (!attendanceReportService.isValidCalendarDate(from) ||
+      !attendanceReportService.isValidCalendarDate(to)) {
+    return res.status(400).json({ message: 'Enter valid start and end dates in YYYY-MM-DD format.' });
+  }
+  if (to < from) {
+    return res.status(400).json({ message: 'The end date must be on or after the start date.' });
+  }
+
+  try {
+    if (studentId !== null && !(await reportModel.hasReportStudent(
+      classId, studentId, courseId, req.user.userId, req.user.role
+    ))) {
+      return res.status(404).json({ message: 'Student not found in this class or you are not authorised.' });
+    }
+
+    const rows = await reportModel.getAttendanceRows({
+      classId, courseId, studentId,
+      from, to,
+      userId: req.user.userId,
+      role: req.user.role,
+    });
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: 'Class not found or you are not authorised to access it.' });
+    }
+
+    const report = attendanceReportService.buildAttendanceReport(rows, {
+      from, to, threshold: attendanceThreshold,
+    });
+
+    // Build CSV content
+    const csv      = reportToCsv(report);
+    const filename = csvFilename(report);
+
+    // SAM-SR-004: audit the export action
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
+      || req.socket.remoteAddress || 'unknown';
+    await auditModel.logEvent({
+      actor: req.user.username,
+      action: 'REPORT_EXPORT_CSV',
+      target: `class/${classId}/course/${courseId}/${from}/${to}`,
+      ipAddress: clientIp,
+      details: `CSV export: ${report.students.length} students, file: ${filename}`,
+    });
+
+    // Send as a file download
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    // UTF-8 BOM so Excel opens the file with correct encoding
+    return res.status(200).send('\uFEFF' + csv);
+
+  } catch (err) {
+    console.error('[Report] CSV export failed:', err.message);
+    return res.status(500).json({ message: 'Unable to export CSV. Please try again.' });
+  }
+}
+
+module.exports = { getReportClasses, getReportStudents, getAttendanceReport, getLowAttendanceReport, exportAttendanceCsv, parsePositiveId };
