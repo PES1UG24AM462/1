@@ -24,6 +24,7 @@ const facultyRoutes = require('./routes/facultyRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const academicRoutes = require('./routes/academicRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
@@ -79,6 +80,8 @@ app.use('/api', roleRoutes);
 
 // SAM-F-014: admin account management
 app.use('/api/admin/users', userRoutes);
+// SAM-F-015: administrator course, class, and enrollment management
+app.use('/api/admin', academicRoutes);
 
 // SAM-F-003 / SAM-F-004: faculty class selection and enrolled roster
 app.use('/api/faculty', facultyRoutes);
