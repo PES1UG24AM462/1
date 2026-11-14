@@ -16,6 +16,7 @@ const bcrypt = require('bcryptjs');
 const userModel = require('../models/userModel');
 const auditModel = require('../models/auditModel');
 const { generateToken } = require('../utils/jwtHelper');
+const { verifyPassword } = require('../utils/passwordHelper');
 
 /**
  * Login handler.
@@ -68,8 +69,8 @@ async function login(req, res) {
     }
 
     // 4. Verify password against bcrypt hash (SAM-SR-002)
-    //    bcrypt.compare does constant-time comparison to prevent timing attacks.
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    //    verifyPassword uses bcrypt.compare — constant-time, safe against timing attacks.
+    const passwordMatch = await verifyPassword(password, user.password_hash);
 
     if (!passwordMatch) {
       // SAM-SR-004: log failure — do NOT log the attempted password
