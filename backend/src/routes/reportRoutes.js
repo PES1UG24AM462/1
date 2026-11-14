@@ -1,17 +1,19 @@
 /**
- * reportRoutes.js
- * Endpoints for attendance reporting and threshold alerts (SAM-F-010, TC-REP-02).
- *
- *   GET /api/reports/low-attendance?classId=X&threshold=75  → faculty or admin
+ * Endpoints for attendance reports and low-attendance alerts.
  */
 
 const { Router } = require('express');
 const { authorise } = require('../middleware/authMiddleware');
-const { getLowAttendanceReport } = require('../controllers/reportController');
+const {
+  getReportClasses,
+  getAttendanceReport,
+  getLowAttendanceReport,
+} = require('../controllers/reportController');
 
 const router = Router();
 
-// SAM-F-010: Flag students below attendance threshold (faculty and admin)
+router.get('/classes', authorise('faculty', 'admin'), getReportClasses);
+router.get('/attendance', authorise('faculty', 'admin'), getAttendanceReport);
 router.get('/low-attendance', authorise('faculty', 'admin'), getLowAttendanceReport);
 
 module.exports = router;

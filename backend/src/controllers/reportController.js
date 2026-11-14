@@ -1,42 +1,91 @@
 /**
- * reportController.js
- * Reporting & analytics controller (SAM-F-010, TC-REP-02).
- *
- *   GET /api/reports/low-attendance
- *     Query params:
- *       - classId (required): integer ID of the class
- *       - threshold (optional): integer percentage (default: 75)
- *     Access:
- *       - Faculty: only for classes assigned to them
- *       - Admin: all classes
+ * Reporting & analytics controller (SAM-F-010, SAM-F-011).
  */
 
 const attendanceModel = require('../models/attendanceModel');
+const reportModel = require('../models/reportModel');
+const attendanceReportService = require('../services/attendanceReportService');
 const facultyModel = require('../models/facultyModel');
 const auditModel = require('../models/auditModel');
+const { attendanceThreshold } = require('../config/attendancePolicy');
 
-/**
- * getLowAttendanceReport
- * Identifies and flags students whose attendance falls below the configured threshold.
- * SAM-F-010, TC-REP-02
- *
- * @route  GET /api/reports/low-attendance
- * @access Faculty or Admin
- */
+function parsePositiveId(value) {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function getReportClasses(req, res) {
+  try {
+    const classes = await reportModel.listReportClasses(req.user.userId, req.user.role);
+    return res.status(200).json({ classes });
+  } catch (err) {
+    console.error('[Report] Class list query failed:', err.message);
+    return res.status(500).json({ message: 'Unable to load report classes. Please try again.' });
+  }
+}
+
+async function getAttendanceReport(req, res) {
+  const classId = parsePositiveId(req.query.classId);
+  const courseId = parsePositiveId(req.query.courseId);
+  const { from, to } = req.query;
+  if (classId === null || courseId === null) {
+    return res.status(400).json({ message: 'Select a valid course and class.' });
+  }
+  if (!attendanceReportService.isValidCalendarDate(from) || !attendanceReportService.isValidCalendarDate(to)) {
+    return res.status(400).json({ message: 'Enter valid start and end dates in YYYY-MM-DD format.' });
+  }
+  if (to < from) {
+    return res.status(400).json({ message: 'The end date must be on or after the start date.' });
+  }
+
+  try {
+    const rows = await reportModel.getAttendanceRows({
+      classId,
+      courseId,
+      from,
+      to,
+      userId: req.user.userId,
+      role: req.user.role,
+    });
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: 'Class and course were not found or you are not authorized to access this class.' });
+    }
+
+    const report = attendanceReportService.buildAttendanceReport(rows, {
+      from,
+      to,
+      threshold: attendanceThreshold,
+    });
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    await auditModel.logEvent({
+      actor: req.user.username,
+      action: 'REPORT_ATTENDANCE',
+      target: `class/${classId}/course/${courseId}/${from}/${to}`,
+      ipAddress: clientIp,
+      details: `${report.students.length} students included in attendance report`,
+    });
+    return res.status(200).json(report);
+  } catch (err) {
+    console.error('[Report] Attendance report generation failed:', err.message);
+    return res.status(500).json({ message: 'Unable to generate attendance report. Please try again.' });
+  }
+}
+
+/** Existing SAM-F-010 low-attendance endpoint. */
 async function getLowAttendanceReport(req, res) {
-  const { classId, threshold = 75 } = req.query;
+  const { classId, threshold = attendanceThreshold } = req.query;
   const numThreshold = Number(threshold);
 
-  if (isNaN(numThreshold) || numThreshold < 1 || numThreshold > 100) {
+  if (!Number.isFinite(numThreshold) || numThreshold < 1 || numThreshold > 100) {
     return res.status(400).json({ message: 'Threshold must be a percentage between 1 and 100.' });
   }
 
-  const parsedClassId = Number.isInteger(Number(classId)) && Number(classId) > 0 ? Number(classId) : null;
+  const parsedClassId = parsePositiveId(classId);
   if (!parsedClassId) {
     return res.status(400).json({ message: 'A valid classId query parameter is required.' });
   }
 
-  // If requester is faculty, verify class is assigned to them
   if (req.user.role === 'faculty') {
     try {
       const assigned = await facultyModel.getAssignedClassRoster(req.user.userId, parsedClassId);
@@ -54,8 +103,6 @@ async function getLowAttendanceReport(req, res) {
       classId: parsedClassId,
       threshold: numThreshold,
     });
-
-    // SAM-SR-004: audit log for reporting access
     const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
     await auditModel.logEvent({
       actor: req.user.username,
@@ -77,4 +124,4 @@ async function getLowAttendanceReport(req, res) {
   }
 }
 
-module.exports = { getLowAttendanceReport };
+module.exports = { getReportClasses, getAttendanceReport, getLowAttendanceReport, parsePositiveId };

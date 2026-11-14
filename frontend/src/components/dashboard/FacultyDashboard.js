@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as facultyService from '../../services/facultyService';
 import { isValidAttendanceDate } from '../../utils/attendanceDate';
@@ -214,7 +214,10 @@ function FacultyDashboard() {
           <h1>Welcome, {user?.fullName || 'Faculty'}</h1>
           <p className="faculty-subtitle">Select a class and date to mark attendance.</p>
         </div>
-        <button className="faculty-signout" type="button" onClick={handleLogout}>Sign out</button>
+        <div className="faculty-header-actions">
+          <Link className="faculty-secondary-button faculty-report-link" to="/reports/attendance">Attendance reports</Link>
+          <button className="faculty-signout" type="button" onClick={handleLogout}>Sign out</button>
+        </div>
       </header>
 
       {/* Class + Date selection (SAM-F-003) */}

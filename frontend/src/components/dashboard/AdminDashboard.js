@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 function AdminDashboard() {
@@ -22,6 +22,7 @@ function AdminDashboard() {
       <h1>Admin Dashboard</h1>
       <p>Logged in as: <strong>{user?.fullName || 'Administrator'}</strong></p>
       <p>Role: <strong>{user?.role}</strong></p>
+      <p><Link to="/reports/attendance">Generate attendance report</Link></p>
       <p style={{ color: '#718096', marginTop: '0.5rem' }}>
         User management, class management, and audit features will be available in the next sprint.
       </p>
