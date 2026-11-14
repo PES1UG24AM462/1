@@ -45,6 +45,7 @@
 .report-secondary-button,
 .report-signout { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0.65rem 1rem; border: 0; border-radius: 6px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
 .report-primary-button { color: #fff; background: #1769aa; }
+.report-filter-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .report-primary-button:disabled { color: #627d98; background: #d9e2ec; cursor: not-allowed; }
 .report-secondary-button { color: #1769aa; background: #eaf3fb; }
 .report-signout { color: #9b2c2c; background: #fff0f0; }

@@ -25,11 +25,28 @@ async function getReportClasses(req, res) {
   }
 }
 
+async function getReportStudents(req, res) {
+  const classId = parsePositiveId(req.query.classId);
+  if (classId === null) return res.status(400).json({ message: 'Select a valid class.' });
+  try {
+    const classes = await reportModel.listReportClasses(req.user.userId, req.user.role);
+    if (!classes.some((item) => Number(item.classId) === classId)) {
+      return res.status(404).json({ message: 'Class not found or not authorized.' });
+    }
+    const students = await reportModel.listReportStudents(classId, req.user.userId, req.user.role);
+    return res.status(200).json({ students });
+  } catch (err) {
+    console.error('[Report] Student list query failed:', err.message);
+    return res.status(500).json({ message: 'Unable to load report students. Please try again.' });
+  }
+}
+
 async function getAttendanceReport(req, res) {
   const classId = parsePositiveId(req.query.classId);
   const courseId = parsePositiveId(req.query.courseId);
+  const studentId = req.query.studentId === undefined ? null : parsePositiveId(req.query.studentId);
   const { from, to } = req.query;
-  if (classId === null || courseId === null) {
+  if (classId === null || courseId === null || (req.query.studentId !== undefined && studentId === null)) {
     return res.status(400).json({ message: 'Select a valid course and class.' });
   }
   if (!attendanceReportService.isValidCalendarDate(from) || !attendanceReportService.isValidCalendarDate(to)) {
@@ -40,9 +57,15 @@ async function getAttendanceReport(req, res) {
   }
 
   try {
+    if (studentId !== null && !(await reportModel.hasReportStudent(
+      classId, studentId, courseId, req.user.userId, req.user.role
+    ))) {
+      return res.status(404).json({ message: 'Student not found in this class or you are not authorized to access the class.' });
+    }
     const rows = await reportModel.getAttendanceRows({
       classId,
       courseId,
+      studentId,
       from,
       to,
       userId: req.user.userId,
@@ -61,7 +84,7 @@ async function getAttendanceReport(req, res) {
     await auditModel.logEvent({
       actor: req.user.username,
       action: 'REPORT_ATTENDANCE',
-      target: `class/${classId}/course/${courseId}/${from}/${to}`,
+      target: `class/${classId}/course/${courseId}${studentId ? `/student/${studentId}` : ''}/${from}/${to}`,
       ipAddress: clientIp,
       details: `${report.students.length} students included in attendance report`,
     });
@@ -124,4 +147,4 @@ async function getLowAttendanceReport(req, res) {
   }
 }
 
-module.exports = { getReportClasses, getAttendanceReport, getLowAttendanceReport, parsePositiveId };
+module.exports = { getReportClasses, getReportStudents, getAttendanceReport, getLowAttendanceReport, parsePositiveId };

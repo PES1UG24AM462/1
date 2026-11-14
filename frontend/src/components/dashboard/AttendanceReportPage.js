@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as reportService from '../../services/reportService';
@@ -23,12 +23,17 @@ function AttendanceReportPage() {
   const [classesError, setClassesError] = useState('');
   const [courseId, setCourseId] = useState('');
   const [classId, setClassId] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [formError, setFormError] = useState('');
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
+  const studentRequest = useRef(0);
 
   const loadClasses = useCallback(async () => {
     setClassesLoading(true);
@@ -63,6 +68,28 @@ function AttendanceReportPage() {
     [classes, courseId]
   );
 
+  useEffect(() => {
+    const requestId = ++studentRequest.current;
+    setStudents([]);
+    setStudentsError('');
+    if (!classId || !courseClasses.some((item) => String(item.classId) === classId)) {
+      setStudentsLoading(false);
+      return undefined;
+    }
+    setStudentsLoading(true);
+    reportService.getReportStudents(classId)
+      .then((result) => {
+        if (studentRequest.current === requestId) setStudents(result.students);
+      })
+      .catch((err) => {
+        if (studentRequest.current === requestId) setStudentsError(err.message || 'Unable to load report students. Please try again.');
+      })
+      .finally(() => {
+        if (studentRequest.current === requestId) setStudentsLoading(false);
+      });
+    return () => { studentRequest.current += 1; };
+  }, [classId, courseClasses]);
+
   function handleLogout() {
     logout();
     navigate('/login', { replace: true });
@@ -89,10 +116,26 @@ function AttendanceReportPage() {
     }
 
     setReportLoading(true);
-    reportService.generateAttendanceReport({ courseId, classId, from, to })
+    const filters = { courseId, classId, from, to };
+    if (studentId) filters.studentId = studentId;
+    reportService.generateAttendanceReport(filters)
       .then(setReport)
       .catch((err) => setReportError(err.message || 'Unable to generate attendance report. Please try again.'))
       .finally(() => setReportLoading(false));
+  }
+
+  function clearFilters() {
+    studentRequest.current += 1;
+    setCourseId('');
+    setClassId('');
+    setStudentId('');
+    setFrom('');
+    setTo('');
+    setStudents([]);
+    setStudentsError('');
+    setReport(null);
+    setReportError('');
+    setFormError('');
   }
 
   const dashboard = user?.role === 'admin' ? '/admin/dashboard' : '/faculty/dashboard';
@@ -130,7 +173,7 @@ function AttendanceReportPage() {
                 <select
                   id="report-course"
                   value={courseId}
-                  onChange={(event) => { setCourseId(event.target.value); setClassId(''); setReport(null); setReportError(''); setFormError(''); }}
+                  onChange={(event) => { setCourseId(event.target.value); setClassId(''); setStudentId(''); setReport(null); setReportError(''); setFormError(''); }}
                   disabled={reportLoading}
                   required
                 >
@@ -147,13 +190,29 @@ function AttendanceReportPage() {
                 <select
                   id="report-class"
                   value={classId}
-                  onChange={(event) => { setClassId(event.target.value); setReport(null); setReportError(''); setFormError(''); }}
+                  onChange={(event) => { setClassId(event.target.value); setStudentId(''); setReport(null); setReportError(''); setFormError(''); }}
                   disabled={!courseId || reportLoading}
                   required
                 >
                   <option value="">Choose a class</option>
                   {courseClasses.map((item) => (
                     <option key={item.classId} value={String(item.classId)}>{classLabel(item)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="report-field" htmlFor="report-student">
+                <span>Student</span>
+                <select
+                  id="report-student"
+                  value={studentId}
+                  onChange={(event) => { setStudentId(event.target.value); setReport(null); setReportError(''); setFormError(''); }}
+                  disabled={!classId || studentsLoading || reportLoading}
+                >
+                  <option value="">All students</option>
+                  {students.map((student) => (
+                    <option key={student.studentId} value={String(student.studentId)}>
+                      {student.studentNumber ? `${student.studentNumber} - ` : ''}{student.fullName || `Student ${student.studentId}`}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -180,11 +239,16 @@ function AttendanceReportPage() {
                 />
               </label>
             </div>
+            {studentsLoading && <p role="status">Loading students for this class...</p>}
+            {studentsError && <p className="report-error" role="alert">{studentsError}</p>}
             {formError && <p className="report-error" role="alert">{formError}</p>}
             {reportError && <p className="report-error" role="alert">{reportError}</p>}
-            <button className="report-primary-button" type="submit" disabled={reportLoading} aria-busy={reportLoading}>
-              {reportLoading ? 'Generating report…' : 'Generate report'}
-            </button>
+            <div className="report-filter-actions">
+              <button className="report-primary-button" type="submit" disabled={reportLoading || studentsLoading} aria-busy={reportLoading}>
+                {reportLoading ? 'Generating report…' : 'Generate report'}
+              </button>
+              <button className="report-secondary-button" type="button" onClick={clearFilters} disabled={reportLoading}>Clear filters</button>
+            </div>
           </form>
         )}
       </section>

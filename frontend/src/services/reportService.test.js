@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { getToken } from './authService';
-import { generateAttendanceReport, getReportClasses } from './reportService';
+import { generateAttendanceReport, getReportClasses, getReportStudents } from './reportService';
 
 jest.mock('axios', () => ({ get: jest.fn() }));
 jest.mock('./authService', () => ({ getToken: jest.fn() }));
@@ -29,6 +29,17 @@ test('requests a report with course, class, and calendar date filters', async ()
   expect(axios.get).toHaveBeenCalledWith('/api/reports/attendance', {
     headers: { Authorization: 'Bearer test-token' },
     params: filters,
+  });
+});
+
+test('loads students scoped to the selected report class with the session token', async () => {
+  const students = [{ studentId: 2, studentNumber: 'PES2', fullName: 'Student 2' }];
+  axios.get.mockResolvedValue({ data: { students } });
+
+  await expect(getReportStudents('10')).resolves.toEqual({ students });
+  expect(axios.get).toHaveBeenCalledWith('/api/reports/students', {
+    headers: { Authorization: 'Bearer test-token' },
+    params: { classId: '10' },
   });
 });
 

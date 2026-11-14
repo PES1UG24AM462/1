@@ -24,6 +24,20 @@ export async function getReportClasses() {
   }
 }
 
+export async function getReportStudents(classId) {
+  try {
+    const { data } = await axios.get(`${API_BASE}/students`, {
+      ...authConfig(),
+      params: { classId },
+    });
+    if (!Array.isArray(data.students)) throw new Error('The server returned an invalid student list.');
+    return data;
+  } catch (err) {
+    if (err.response) throw errorFromResponse(err, 'Unable to load report students. Please try again.');
+    throw err;
+  }
+}
+
 export async function generateAttendanceReport(filters) {
   try {
     const { data } = await axios.get(`${API_BASE}/attendance`, {
