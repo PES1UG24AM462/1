@@ -11,6 +11,7 @@
 const { Router } = require('express');
 const { authorise } = require('../middleware/authMiddleware');
 const { runIntegrityChecks } = require('../utils/dbIntegrity');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 const router = Router();
 
@@ -19,13 +20,13 @@ const router = Router();
  * @desc   Run all database integrity checks (SAM-NF-004 / TC-REC-01)
  * @access Admin only
  */
-router.get('/health', authorise('admin'), async (req, res) => {
+  router.get('/health', authorise('admin'), async (req, res) => {
   try {
     const result = await runIntegrityChecks();
     // 200 if all checks pass, 503 if any check fails
     return res.status(result.ok ? 200 : 503).json(result);
   } catch (err) {
-    console.error('[DB Health] Integrity check failed:', err.message);
+    logOperationalError('database.integrity_check_failed', err, res);
     return res.status(500).json({
       ok: false,
       message: 'Unable to run integrity checks. Database may be unavailable.',

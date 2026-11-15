@@ -14,6 +14,7 @@
 const bcrypt = require('bcryptjs');
 const validator = require('validator');
 const userModel = require('../models/userModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 const ROLES = ['student', 'faculty', 'admin'];
 const BCRYPT_COST = 12;
@@ -38,7 +39,7 @@ async function listUsers(_req, res) {
     const users = await userModel.listUsers();
     return res.status(200).json({ users });
   } catch (err) {
-    console.error('[Users] list failed:', err.message);
+    logOperationalError('users.list_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }
@@ -99,7 +100,7 @@ async function createUser(req, res) {
     if (err && err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'That username or USN already exists.' });
     }
-    console.error('[Users] create failed:', err.message);
+    logOperationalError('users.create_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }
@@ -162,7 +163,7 @@ async function updateUser(req, res) {
     if (!updated) return res.status(404).json({ message: 'User not found.' });
     return res.status(200).json({ message: 'Account updated.', userId, changed });
   } catch (err) {
-    console.error('[Users] update failed:', err.message);
+    logOperationalError('users.update_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }

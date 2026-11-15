@@ -7,6 +7,7 @@
  */
 
 const TARGET_MS = parseInt(process.env.RESPONSE_TARGET_MS, 10) || 3000;
+const logger = require('../utils/logger');
 
 function responseTime(req, res, next) {
   const start = process.hrtime.bigint();
@@ -22,7 +23,23 @@ function responseTime(req, res, next) {
   res.on('finish', () => {
     const ms = Number(process.hrtime.bigint() - start) / 1e6;
     if (ms > TARGET_MS) {
-      console.warn(`[Perf] ${req.method} ${req.originalUrl} took ${ms.toFixed(0)}ms (target ${TARGET_MS}ms)`);
+      logger.warn('http.slow_request', {
+        requestId: req.requestId,
+        method: req.method,
+        route: req.route ? `${req.baseUrl || ''}${req.route.path}` : 'unmatched',
+        status: res.statusCode,
+        durationMs: Number(ms.toFixed(1)),
+        targetMs: TARGET_MS,
+      });
+    }
+    if (res.statusCode >= 500) {
+      logger.error('http.server_error', {
+        requestId: req.requestId,
+        method: req.method,
+        route: req.route ? `${req.baseUrl || ''}${req.route.path}` : 'unmatched',
+        status: res.statusCode,
+        durationMs: Number(ms.toFixed(1)),
+      });
     }
   });
 
