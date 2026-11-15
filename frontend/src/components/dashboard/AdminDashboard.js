@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getToken } from '../../services/authService';
 import * as academicService from '../../services/academicService';
+import DashboardSummary from './DashboardSummary';
 import './AdminDashboard.css';
 
 const AUDIT_PAGE_SIZE = 25;
@@ -294,6 +295,9 @@ function AdminDashboard() {
           <button className="admin-signout" type="button" onClick={handleLogout}>Sign out</button>
         </div>
       </header>
+
+      {/* SAM-F-017: Attendance summary */}
+      <DashboardSummary />
 
       <nav className="admin-tabs" aria-label="Academic management sections" role="tablist">
         {SECTIONS.map((section) => (
