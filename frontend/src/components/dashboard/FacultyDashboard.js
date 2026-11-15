@@ -15,6 +15,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as facultyService from '../../services/facultyService';
 import { isValidAttendanceDate } from '../../utils/attendanceDate';
+import DashboardSummary from './DashboardSummary';
 import './FacultyDashboard.css';
 
 const STATUSES = ['Present', 'Absent', 'Late'];
@@ -219,6 +220,9 @@ function FacultyDashboard() {
           <button className="faculty-signout" type="button" onClick={handleLogout}>Sign out</button>
         </div>
       </header>
+
+      {/* SAM-F-017: Attendance summary */}
+      <DashboardSummary />
 
       {/* Class + Date selection (SAM-F-003) */}
       <section className="faculty-card" aria-labelledby="selection-title">

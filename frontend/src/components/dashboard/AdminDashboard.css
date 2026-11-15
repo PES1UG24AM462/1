@@ -1,0 +1,88 @@
+.admin-page {
+  --admin-ink: #1b2b39;
+  --admin-muted: #647585;
+  --admin-line: #dce5eb;
+  --admin-blue: #176b87;
+  --admin-soft: #f4f8fa;
+  min-height: 100vh;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: #f3f6f8;
+  color: var(--admin-ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.admin-page * { box-sizing: border-box; }
+.admin-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; max-width: 1440px; margin: 0 auto 1.75rem; }
+.admin-eyebrow, .admin-kicker { margin: 0 0 .4rem; color: var(--admin-blue); font-size: .76rem; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+.admin-header h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.5rem); letter-spacing: -.035em; }
+.admin-subtitle { margin: .55rem 0 0; color: var(--admin-muted); }
+.admin-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: .65rem; flex-wrap: wrap; }
+.admin-user { color: var(--admin-muted); font-size: .9rem; margin-right: .4rem; }
+.admin-secondary-button, .admin-signout, .admin-primary-button { display: inline-flex; justify-content: center; align-items: center; min-height: 2.55rem; padding: .55rem .9rem; border-radius: .55rem; font: inherit; font-size: .88rem; font-weight: 650; text-decoration: none; cursor: pointer; transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+.admin-secondary-button { color: var(--admin-ink); border: 1px solid var(--admin-line); background: #fff; }
+.admin-secondary-button:hover { background: var(--admin-soft); }
+.admin-signout { color: #8e3a39; border: 1px solid #eed3d1; background: #fff8f7; }
+.admin-signout:hover { background: #ffefed; }
+.admin-primary-button { color: #fff; border: 1px solid var(--admin-blue); background: var(--admin-blue); }
+.admin-primary-button:hover:not(:disabled) { background: #0f5c75; transform: translateY(-1px); }
+.admin-primary-button:disabled { cursor: not-allowed; opacity: .58; }
+.admin-tabs { display: flex; gap: .35rem; max-width: 1440px; margin: 0 auto 1.1rem; padding: .35rem; border: 1px solid var(--admin-line); border-radius: .8rem; background: #eaf0f3; }
+.admin-tab { min-width: 7.5rem; padding: .65rem 1rem; border: 0; border-radius: .55rem; background: transparent; color: var(--admin-muted); font: inherit; font-size: .9rem; font-weight: 650; cursor: pointer; }
+.admin-tab:hover { color: var(--admin-ink); }
+.admin-tab-active { background: #fff; color: var(--admin-blue); box-shadow: 0 1px 3px #20394a18; }
+.admin-layout, .admin-panel, .admin-message, .admin-loading { max-width: 1440px; }
+.admin-layout { display: grid; grid-template-columns: minmax(300px, .82fr) minmax(0, 1.35fr); align-items: start; gap: 1rem; margin: 0 auto; }
+.admin-panel { margin: 0 auto; padding: clamp(1rem, 2vw, 1.5rem); border: 1px solid var(--admin-line); border-radius: .9rem; background: #fff; box-shadow: 0 8px 24px #20394a08; }
+.admin-layout > .admin-panel { width: 100%; max-width: none; }
+.admin-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
+.admin-panel h2 { margin: 0; font-size: 1.28rem; letter-spacing: -.02em; }
+.admin-panel-heading .admin-kicker { margin-bottom: .2rem; }
+.admin-count { padding: .3rem .65rem; border: 1px solid #d7e8ee; border-radius: 999px; background: #f3fafc; color: #286277; font-size: .78rem; font-weight: 650; white-space: nowrap; }
+.admin-form { display: grid; gap: .85rem; margin-top: 1.1rem; }
+.admin-form h3 { margin: 0 0 .1rem; font-size: 1rem; }
+.admin-form label, .admin-enrollment-toolbar label, .admin-enroll-form label { display: grid; gap: .38rem; color: #354b5a; font-size: .84rem; font-weight: 650; }
+.admin-form input, .admin-form textarea, .admin-form select, .admin-enrollment-toolbar select, .admin-enroll-form select { width: 100%; min-height: 2.55rem; padding: .58rem .68rem; border: 1px solid #cad7df; border-radius: .5rem; background: #fff; color: var(--admin-ink); font: inherit; font-size: .9rem; }
+.admin-form textarea { resize: vertical; line-height: 1.45; }
+.admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus, .admin-enrollment-toolbar select:focus, .admin-enroll-form select:focus { outline: 3px solid #176b8722; border-color: var(--admin-blue); }
+.admin-form select:disabled { background: #f1f4f6; color: var(--admin-muted); }
+.admin-optional { color: #82909a; font-size: .78rem; font-weight: 450; }
+.admin-form-actions { display: flex; gap: .55rem; margin-top: .15rem; }
+.admin-list-panel > h2 { margin-bottom: 1rem; }
+.admin-record-list { display: grid; }
+.admin-record { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1rem 0; border-top: 1px solid #e8eef1; }
+.admin-record:first-child { border-top: 0; padding-top: .15rem; }
+.admin-record h3 { margin: .22rem 0 .35rem; font-size: 1rem; }
+.admin-record p { margin: .25rem 0 .45rem; color: var(--admin-muted); font-size: .88rem; line-height: 1.45; }
+.admin-record small { color: #778792; }
+.admin-record-code { color: var(--admin-blue); font-size: .75rem; font-weight: 750; letter-spacing: .06em; }
+.admin-text-button, .admin-inline-button { border: 0; background: transparent; color: var(--admin-blue); font: inherit; font-size: .87rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.admin-text-button:hover, .admin-inline-button:hover { text-decoration: underline; }
+.admin-message { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin: 0 auto 1rem; padding: .75rem .9rem; border: 1px solid; border-radius: .6rem; font-size: .88rem; }
+.admin-panel .admin-message { max-width: none; margin-top: .75rem; }
+.admin-message-success { border-color: #c8e8d7; background: #f1fbf5; color: #236542; }
+.admin-message-error { border-color: #f0d0cd; background: #fff5f3; color: #923b36; }
+.admin-message-info { border-color: #cce1eb; background: #f3f9fc; color: #315c70; }
+.admin-loading, .admin-empty { color: var(--admin-muted); font-size: .9rem; }
+.admin-loading { margin: 1.3rem auto; }
+.admin-empty { margin: .8rem 0; padding: 1rem; border: 1px dashed #cbd8df; border-radius: .6rem; background: #fbfcfd; text-align: center; }
+.admin-enrollment-toolbar { display: flex; align-items: flex-end; gap: 1rem; margin-bottom: 1.2rem; }
+.admin-enrollment-toolbar label { width: min(100%, 520px); }
+.admin-selected-faculty { padding-bottom: .65rem; color: var(--admin-muted); font-size: .85rem; }
+.admin-enroll-form { display: flex; align-items: flex-end; gap: .7rem; padding: 1rem; border: 1px solid #e0e9ee; border-radius: .7rem; background: var(--admin-soft); }
+.admin-enroll-form label { flex: 1; }
+.admin-table-wrap { width: 100%; overflow-x: auto; margin-top: 1.2rem; }
+.admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .88rem; }
+.admin-table th { padding: .7rem .75rem; border-bottom: 1px solid var(--admin-line); color: var(--admin-muted); font-size: .76rem; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.admin-table td { padding: .8rem .75rem; border-bottom: 1px solid #e9eff2; }
+.admin-history-note { margin: 1rem 0 0; color: #72828d; font-size: .8rem; }
+@media (max-width: 860px) { .admin-header { flex-direction: column; } .admin-header-actions { justify-content: flex-start; } .admin-layout { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .admin-page { padding: .9rem; }
+  .admin-tabs { width: 100%; }
+  .admin-tab { min-width: 0; flex: 1; padding-inline: .45rem; font-size: .82rem; }
+  .admin-header-actions { align-items: stretch; width: 100%; }
+  .admin-header-actions > * { flex: 1; }
+  .admin-user { display: none; }
+  .admin-enrollment-toolbar, .admin-enroll-form { align-items: stretch; flex-direction: column; }
+  .admin-selected-faculty { padding-bottom: 0; }
+  .admin-table { min-width: 590px; }
+}

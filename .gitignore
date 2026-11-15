@@ -12,6 +12,11 @@ frontend/.env
 # React build output
 frontend/build/
 
+# Backup files — contain sensitive DB data, never commit
+backups/
+*.sql.gz
+*.sql.gz.sha256
+
 # macOS
 .DS_Store
 
