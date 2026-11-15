@@ -1,3 +1,15 @@
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    defaults: {},
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+    post: jest.fn(),
+  },
+}));
+
 import axios from 'axios';
 import { login } from './authService';
 import { assertSecureApiTransport } from './apiConfig';

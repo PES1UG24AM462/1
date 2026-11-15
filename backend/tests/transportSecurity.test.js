@@ -51,6 +51,8 @@ afterEach(() => {
 
 test('rejects plaintext login and authenticated API requests before processing their bodies', async () => {
   const app = productionApp();
+  const userModel = require('../src/models/userModel');
+  const findByUsername = jest.spyOn(userModel, 'findByUsername');
 
   const login = await request(app)
     .post('/api/auth/login')
@@ -59,6 +61,7 @@ test('rejects plaintext login and authenticated API requests before processing t
 
   expect(login.status).toBe(426);
   expect(login.body.message).toMatch(/https/i);
+  expect(findByUsername).not.toHaveBeenCalled();
   expect(protectedRequest.status).toBe(426);
 });
 
@@ -112,12 +115,21 @@ test('allows only configured HTTPS CORS origins without credentialed CORS', asyn
     .get('/api/health')
     .set('X-Forwarded-Proto', 'https')
     .set('Origin', 'https://untrusted.example');
+  const preflight = await request(app)
+    .options('/api/attendance')
+    .set('X-Forwarded-Proto', 'https')
+    .set('Origin', 'https://attendance.example.edu')
+    .set('Access-Control-Request-Method', 'PATCH')
+    .set('Access-Control-Request-Headers', 'authorization,content-type');
 
   expect(accepted.status).toBe(200);
   expect(accepted.headers['access-control-allow-origin']).toBe('https://attendance.example.edu');
   expect(accepted.headers['access-control-allow-credentials']).toBeUndefined();
   expect(rejected.status).toBe(403);
   expect(rejected.headers['access-control-allow-origin']).toBeUndefined();
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers['access-control-allow-methods']).toBe('GET,HEAD,POST,PATCH');
+  expect(preflight.headers['access-control-allow-headers']).toBe('Authorization,Content-Type');
 });
 
 test('rejects wildcard or malformed production CORS origins at configuration time', () => {
