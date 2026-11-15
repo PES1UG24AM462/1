@@ -69,8 +69,8 @@ describe('SAM-F-014 — create', () => {
     expect(arg.passwordHash).toMatch(/^\$2[aby]\$/);
     expect(arg.passwordHash).not.toContain('Passw0rd!x');
     expect(arg.usn).toBe('PES1UG24AM900');
-    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_CREATED', target: 'users/42' }));
-    expect(JSON.stringify(auditModel.logEvent.mock.calls)).not.toContain('Passw0rd!x');
+    expect(arg.auditEvent).toEqual(expect.objectContaining({ action: 'USER_CREATED', target: 'users/pending' }));
+    expect(JSON.stringify(arg.auditEvent)).not.toContain('Passw0rd!x');
   });
 
   test.each([
@@ -98,12 +98,14 @@ describe('SAM-F-014 — create', () => {
 
 describe('SAM-F-014 — update / deactivate', () => {
   test('deactivates another account and audits it', async () => {
-    userModel.findById = jest.fn().mockImplementation(async (uid) => ({ user_id: uid, username: `u${uid}`, role: uid === 1 ? 'admin' : 'student', is_active: 1, full_name: 'X' }));
+    userModel.findById = jest.fn().mockImplementation(async (uid) => ({ user_id: uid, username: uid === 1 ? 'admin_user' : `u${uid}`, role: uid === 1 ? 'admin' : 'student', is_active: 1, full_name: 'X' }));
     userModel.updateUser = jest.fn().mockResolvedValue(true);
     const res = await request(app).patch('/api/admin/users/7').set('Authorization', `Bearer ${adminToken()}`).send({ isActive: false });
     expect(res.status).toBe(200);
-    expect(userModel.updateUser).toHaveBeenCalledWith(7, expect.objectContaining({ isActive: false }));
-    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_UPDATED', target: 'users/7' }));
+    expect(userModel.updateUser).toHaveBeenCalledWith(7, expect.objectContaining({ isActive: false }), expect.objectContaining({
+      actor: 'admin_user',
+      changes: expect.objectContaining({ isActive: false }),
+    }));
   });
 
   test('admin cannot deactivate themselves', async () => {

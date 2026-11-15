@@ -24,6 +24,10 @@ const facultyRoutes = require('./routes/facultyRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const academicRoutes = require('./routes/academicRoutes');
+const dbHealthRoutes = require('./routes/dbHealthRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
@@ -79,6 +83,9 @@ app.use('/api', roleRoutes);
 
 // SAM-F-014: admin account management
 app.use('/api/admin/users', userRoutes);
+app.use('/api/admin/audit-logs', auditRoutes);
+// SAM-F-015: administrator course, class, and enrollment management
+app.use('/api/admin', academicRoutes);
 
 // SAM-F-003 / SAM-F-004: faculty class selection and enrolled roster
 app.use('/api/faculty', facultyRoutes);
@@ -91,6 +98,12 @@ app.use('/api/attendance', attendanceRoutes);
 
 // SAM-F-010: reporting & low attendance threshold alerts (faculty / admin)
 app.use('/api/reports', reportRoutes);
+
+// SAM-NF-004: database integrity health check (admin only)
+app.use('/api/admin/db', dbHealthRoutes);
+
+// SAM-F-017: dashboard attendance summaries (all roles)
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler for unknown routes
 app.use((_req, res) => {
