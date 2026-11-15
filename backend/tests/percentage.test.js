@@ -142,6 +142,15 @@ describe('TC-REP-01 — SAM-F-009: Calculate accurate attendance percentages', (
     expect(percentageModel.getAttendancePercentages).toHaveBeenCalledWith(3, 1);
   });
 
+  test('ignores client-supplied student and user IDs when selecting percentages', async () => {
+    const res = await request(app)
+      .get('/api/student/attendance/percentage?courseId=1&studentId=102&userId=8')
+      .set('Authorization', `Bearer ${studentToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(percentageModel.getAttendancePercentages).toHaveBeenCalledWith(3, 1);
+  });
+
   // ── No records yet ────────────────────────────────────────────────────────
   test('should return empty array when student has no attendance records', async () => {
     percentageModel.getAttendancePercentages = jest.fn().mockResolvedValue([]);
