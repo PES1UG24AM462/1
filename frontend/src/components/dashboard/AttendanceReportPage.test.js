@@ -15,6 +15,7 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('../../services/reportService', () => ({
   getReportClasses: jest.fn(),
+  getReportStudents: jest.fn(),
   generateAttendanceReport: jest.fn(),
 }));
 
@@ -70,6 +71,7 @@ async function setField(selector, value) {
 async function chooseReportFilters() {
   await setField('#report-course', '3');
   await setField('#report-class', '10');
+  await act(async () => { await Promise.resolve(); });
   await setField('#report-from', '2026-10-01');
   await setField('#report-to', '2026-10-31');
 }
@@ -81,6 +83,7 @@ beforeEach(() => {
   useNavigate.mockReturnValue(jest.fn());
   useAuth.mockReturnValue({ user: { role: 'faculty' }, logout: jest.fn() });
   reportService.getReportClasses.mockResolvedValue({ classes: availableClasses });
+  reportService.getReportStudents.mockResolvedValue({ students: [{ studentId: 1, studentNumber: 'PES1', fullName: 'Asha Student' }] });
   reportService.generateAttendanceReport.mockResolvedValue(generatedReport);
 });
 
@@ -132,4 +135,20 @@ test('rejects a reversed range in the UI and shows an empty attendance state', a
     await Promise.resolve();
   });
   expect(container.textContent).toContain('No attendance records found for the selected class and date range.');
+});
+
+test('loads students for the selected class and combines the student with existing report filters', async () => {
+  await renderPage();
+  await chooseReportFilters();
+  await setField('#report-student', '1');
+  await act(async () => {
+    Simulate.submit(container.querySelector('form'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(reportService.getReportStudents).toHaveBeenCalledWith('10');
+  expect(reportService.generateAttendanceReport).toHaveBeenCalledWith({
+    courseId: '3', classId: '10', studentId: '1', from: '2026-10-01', to: '2026-10-31',
+  });
 });
