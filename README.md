@@ -104,6 +104,23 @@ npm test
 
 Tests mock the database layer and run without a live MySQL instance.
 
+## Production HTTPS/TLS (SAM-NF-003)
+
+Production must terminate TLS either in this Node.js server or at the trusted
+deployment proxy. The API rejects every request that Express does not recognize
+as HTTPS with `426 HTTPS Required`; it never redirects requests containing
+credentials or authenticated data. A TLS proxy must forward
+`X-Forwarded-Proto: https`, and its exact IP address/CIDR must be listed in
+`TRUSTED_PROXY_IPS`. Do not trust forwarded headers from arbitrary clients.
+
+For direct TLS termination, provide deployment-managed certificate and private
+key paths through `TLS_CERT_PATH` and `TLS_KEY_PATH`; the server requires TLS
+1.2 or newer. Never place certificates or private keys in source control. For
+proxy termination, leave both paths unset and configure the proxy to accept only
+modern TLS. Set `ALLOWED_ORIGINS` to the comma-separated HTTPS origins used by
+the production frontend. HSTS (`max-age=31536000`) is sent only on secure
+production responses. The local CRA proxy remains HTTP for development only.
+
 ---
 
 ## Requirements Traceability
