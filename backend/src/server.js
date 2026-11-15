@@ -25,6 +25,7 @@ const studentRoutes = require('./routes/studentRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const academicRoutes = require('./routes/academicRoutes');
+const dbHealthRoutes = require('./routes/dbHealthRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
@@ -94,6 +95,9 @@ app.use('/api/attendance', attendanceRoutes);
 
 // SAM-F-010: reporting & low attendance threshold alerts (faculty / admin)
 app.use('/api/reports', reportRoutes);
+
+// SAM-NF-004: database integrity health check (admin only)
+app.use('/api/admin/db', dbHealthRoutes);
 
 // 404 handler for unknown routes
 app.use((_req, res) => {
