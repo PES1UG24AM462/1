@@ -44,3 +44,19 @@ test('class edits update only explicitly mapped schema columns', async () => {
   expect(sql).toContain('academic_yr = ?');
   expect(params).toEqual([8, 'B', null, 12]);
 });
+
+test.each([
+  ['course creation', (connection) => academicModel.createCourse({ courseCode: 'CS1', courseName: 'Course', description: null, credits: null }, connection), /INSERT INTO courses/],
+  ['course update', (connection) => academicModel.updateCourse(3, { courseName: 'New Name' }, connection), /UPDATE courses/],
+  ['class creation', (connection) => academicModel.createClass({ courseId: 1, facultyId: 2, section: 'A', academicYear: '2026-27' }, connection), /INSERT INTO classes/],
+  ['class update', (connection) => academicModel.updateClass(4, { section: 'B' }, connection), /UPDATE classes/],
+  ['enrollment creation', (connection) => academicModel.enrollStudent(5, 4, connection), /INSERT INTO enrollments/],
+])('%s uses the supplied transaction connection', async (_name, write, expectedSql) => {
+  const connection = { execute: jest.fn().mockResolvedValue([{ insertId: 20, affectedRows: 1 }]) };
+
+  await write(connection);
+
+  expect(connection.execute).toHaveBeenCalledTimes(1);
+  expect(connection.execute.mock.calls[0][0]).toMatch(expectedSql);
+  expect(pool.execute).not.toHaveBeenCalled();
+});

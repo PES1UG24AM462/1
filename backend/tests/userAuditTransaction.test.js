@@ -27,18 +27,19 @@ function setup({ auditFailure = false } = {}) {
 beforeEach(() => jest.clearAllMocks());
 
 describe('SAM-F-016 administrative audit transaction', () => {
-  test('records safe before/after fields on the same transaction as an account update', async () => {
+  test('records changed field names on the same transaction as an account update', async () => {
     const connection = setup();
     const updated = await userModel.updateUser(7, { fullName: 'New Name' }, {
       actor: 'admin_user', ipAddress: '127.0.0.1', changed: ['fullName'],
-      changes: { fullName: 'New Name' }, passwordReset: false,
+      passwordReset: false,
     });
 
     expect(updated).toBe(true);
     expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
       actor: 'admin_user', action: 'USER_UPDATED', target: 'users/7', connection,
-      details: JSON.stringify({ changed: ['fullName'], previous: { fullName: 'Old Name' }, updated: { fullName: 'New Name' } }),
+      details: JSON.stringify({ changed: ['fullName'] }),
     }));
+    expect(connection.execute.mock.calls[0][0]).toMatch(/SELECT user_id\s+FROM users/);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.rollback).not.toHaveBeenCalled();
   });
@@ -47,7 +48,7 @@ describe('SAM-F-016 administrative audit transaction', () => {
     const connection = setup({ auditFailure: true });
     await expect(userModel.updateUser(7, { fullName: 'New Name' }, {
       actor: 'admin_user', ipAddress: null, changed: ['fullName'],
-      changes: { fullName: 'New Name' }, passwordReset: false,
+      passwordReset: false,
     })).rejects.toThrow('audit unavailable');
 
     expect(connection.rollback).toHaveBeenCalledTimes(1);

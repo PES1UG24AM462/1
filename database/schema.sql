@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS attendance (
 CREATE TABLE IF NOT EXISTS audit_log (
   audit_id    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   actor       VARCHAR(100)        NULL,   -- username or NULL for anonymous
-  action      VARCHAR(100)    NOT NULL,   -- e.g. LOGIN_SUCCESS, LOGIN_FAILURE, ATTENDANCE_EDIT
+  action      VARCHAR(100)    NOT NULL,   -- e.g. LOGIN_SUCCESS, LOGIN_FAILED, ATTENDANCE_CORRECTION
   target      VARCHAR(255)    NOT NULL,   -- e.g. users/42, attendance/17
   ip_address  VARCHAR(45)         NULL,   -- IPv4 or IPv6
   details     TEXT                NULL,   -- optional JSON/text detail

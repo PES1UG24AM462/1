@@ -41,15 +41,29 @@ describe('SAM-F-016 protected audit history', () => {
   });
 
   test('returns events to an administrator and applies validated filters', async () => {
-    const response = await request(app).get('/api/admin/audit-logs?action=ATTENDANCE_CORRECTION&limit=20&offset=10')
+    const response = await request(app).get('/api/admin/audit-logs?action=ATTENDANCE_CORRECTION&limit=20&offset=10&startDate=2026-10-01&endDate=2026-10-31')
       .set('Authorization', `Bearer ${token(1, 'admin_user', 'admin')}`);
     expect(response.status).toBe(200);
     expect(response.body.events[0].details).toContain('previousStatus');
-    expect(auditModel.listEvents).toHaveBeenCalledWith({ action: 'ATTENDANCE_CORRECTION', actor: null, limit: 20, offset: 10 });
+    expect(auditModel.listEvents).toHaveBeenCalledWith({
+      action: 'ATTENDANCE_CORRECTION', actor: null,
+      startDate: '2026-10-01', endDate: '2026-10-31', limit: 20, offset: 10,
+    });
   });
 
   test('rejects malformed filters before querying the audit log', async () => {
     const response = await request(app).get('/api/admin/audit-logs?limit=1000')
+      .set('Authorization', `Bearer ${token(1, 'admin_user', 'admin')}`);
+    expect(response.status).toBe(400);
+    expect(auditModel.listEvents).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['startDate=2026-02-30', 'endDate=2026-03-01'],
+    ['startDate=2026-04-01', 'endDate=2026-03-31'],
+  ])('rejects invalid or reversed audit date ranges (%s, %s)', async (start, end) => {
+    const response = await request(app)
+      .get(`/api/admin/audit-logs?${start}&${end}`)
       .set('Authorization', `Bearer ${token(1, 'admin_user', 'admin')}`);
     expect(response.status).toBe(400);
     expect(auditModel.listEvents).not.toHaveBeenCalled();

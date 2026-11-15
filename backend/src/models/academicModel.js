@@ -26,8 +26,8 @@ async function getCourseById(courseId) {
   return rows[0] || null;
 }
 
-async function createCourse({ courseCode, courseName, description, credits }) {
-  const [result] = await pool.execute(
+async function createCourse({ courseCode, courseName, description, credits }, connection = pool) {
+  const [result] = await connection.execute(
     `INSERT INTO courses (course_code, course_name, description, credits)
      VALUES (?, ?, ?, ?)`,
     [courseCode, courseName, description, credits]
@@ -35,7 +35,7 @@ async function createCourse({ courseCode, courseName, description, credits }) {
   return result.insertId;
 }
 
-async function updateCourse(courseId, fields) {
+async function updateCourse(courseId, fields, connection = pool) {
   const columnByField = {
     courseCode: 'course_code',
     courseName: 'course_name',
@@ -52,7 +52,7 @@ async function updateCourse(courseId, fields) {
   });
   if (assignments.length === 0) return false;
   values.push(courseId);
-  const [result] = await pool.execute(
+  const [result] = await connection.execute(
     `UPDATE courses SET ${assignments.join(', ')} WHERE course_id = ?`,
     values
   );
@@ -119,8 +119,8 @@ async function listFaculty() {
   return rows;
 }
 
-async function createClass({ courseId, facultyId, section, academicYear }) {
-  const [result] = await pool.execute(
+async function createClass({ courseId, facultyId, section, academicYear }, connection = pool) {
+  const [result] = await connection.execute(
     `INSERT INTO classes (course_id, faculty_id, section, academic_yr)
      VALUES (?, ?, ?, ?)`,
     [courseId, facultyId, section, academicYear]
@@ -128,7 +128,7 @@ async function createClass({ courseId, facultyId, section, academicYear }) {
   return result.insertId;
 }
 
-async function updateClass(classId, fields) {
+async function updateClass(classId, fields, connection = pool) {
   const columnByField = {
     courseId: 'course_id',
     facultyId: 'faculty_id',
@@ -145,7 +145,7 @@ async function updateClass(classId, fields) {
   });
   if (assignments.length === 0) return false;
   values.push(classId);
-  const [result] = await pool.execute(
+  const [result] = await connection.execute(
     `UPDATE classes SET ${assignments.join(', ')} WHERE class_id = ?`,
     values
   );
@@ -197,8 +197,8 @@ async function listClassEnrollments(classId) {
   return rows;
 }
 
-async function enrollStudent(studentId, classId) {
-  const [result] = await pool.execute(
+async function enrollStudent(studentId, classId, connection = pool) {
+  const [result] = await connection.execute(
     `INSERT INTO enrollments (student_id, class_id) VALUES (?, ?)`,
     [studentId, classId]
   );
