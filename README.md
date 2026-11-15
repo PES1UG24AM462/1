@@ -82,8 +82,11 @@ npm run dev
 ```bash
 # Run schema first, then seed
 mysql -u root -p < database/schema.sql
+mysql -u root -p student_attendance_db < database/migrations/20261115_audit_log_append_only.sql
 mysql -u root -p < database/seed.sql
 ```
+
+Audit history retention, the database append-only guards, backup behavior, and the pending institutional retention-policy decision are documented in [docs/audit-retention.md](docs/audit-retention.md).
 
 ### Frontend
 
@@ -120,6 +123,7 @@ Tests mock the database layer and run without a live MySQL instance.
 | SAM-F-008 | Students view their own persisted attendance history by course and date (TC-STU-01; AC-SAM-F-008) | Implemented |
 | SAM-F-007 | Authorized faculty corrects an existing attendance row; correction is timestamped (TC-ATT-04) | Implemented |
 | SAM-NF-002 | 99.5% monthly availability excluding scheduled maintenance (AC-SAM-NF-002; TC-OPS-01) | Health/readiness checks and calculation helper implemented; production uptime requires external monitoring evidence |
+| SAM-NF-006 | Retain audit records for at least one academic year or configured institutional period (TC-AUD-02) | Append-only database guards; automatic deletion disabled pending confirmation of institutional policy |
 
 Availability measurement and the operational dependencies for SAM-NF-002 are documented in [docs/availability.md](docs/availability.md).
 
