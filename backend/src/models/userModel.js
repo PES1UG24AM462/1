@@ -12,6 +12,7 @@
 
 const { pool } = require('../config/database');
 const { hashPassword } = require('../utils/passwordHelper');
+const auditModel = require('./auditModel');
 
 /**
  * findByUsername
@@ -94,6 +95,7 @@ async function createUser({
   usn = null,
   department = null,
   semester = null,
+  auditEvent = null,
 }) {
   const finalHash = passwordHash || (plaintextPassword ? await hashPassword(plaintextPassword) : null);
 
@@ -103,6 +105,7 @@ async function createUser({
        VALUES (?, ?, ?, ?, ?, 1)`,
       [username, finalHash, role, fullName, email]
     );
+    if (auditEvent) await auditModel.logEvent({ ...auditEvent, target: `users/${result.insertId}` });
     return result.insertId;
   }
 
@@ -126,6 +129,11 @@ async function createUser({
         [userId, department]
       );
     }
+    if (auditEvent) await auditModel.logEvent({
+      ...auditEvent,
+      target: `users/${userId}`,
+      connection: conn,
+    });
     await conn.commit();
     return userId;
   } catch (err) {
@@ -144,7 +152,7 @@ async function createUser({
  * @param {Object} fields - any of { fullName, email, isActive, passwordHash }
  * @returns {Promise<boolean>} true if a row was updated
  */
-async function updateUser(userId, { fullName, email, isActive, passwordHash }) {
+async function updateUser(userId, { fullName, email, isActive, passwordHash }, auditEvent = null) {
   const sets = [];
   const values = [];
   if (fullName !== undefined) { sets.push('full_name = ?'); values.push(fullName); }
@@ -153,8 +161,54 @@ async function updateUser(userId, { fullName, email, isActive, passwordHash }) {
   if (passwordHash !== undefined) { sets.push('password_hash = ?'); values.push(passwordHash); }
   if (sets.length === 0) return false;
   values.push(userId);
-  const [result] = await pool.execute(`UPDATE users SET ${sets.join(', ')} WHERE user_id = ?`, values);
-  return result.affectedRows > 0;
+  if (!auditEvent) {
+    const [result] = await pool.execute(`UPDATE users SET ${sets.join(', ')} WHERE user_id = ?`, values);
+    return result.affectedRows > 0;
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute(
+      `SELECT username, role, full_name AS fullName, email, is_active AS isActive
+       FROM users WHERE user_id = ? FOR UPDATE`,
+      [userId]
+    );
+    const previous = rows[0];
+    if (!previous) {
+      await conn.rollback();
+      return false;
+    }
+    const [result] = await conn.execute(`UPDATE users SET ${sets.join(', ')} WHERE user_id = ?`, values);
+    if (result.affectedRows > 0) {
+      const updated = {};
+      for (const field of ['fullName', 'email', 'isActive']) {
+        if (auditEvent.changes[field] !== undefined) updated[field] = auditEvent.changes[field];
+      }
+      const before = {};
+      for (const field of Object.keys(updated)) before[field] = previous[field];
+      await auditModel.logEvent({
+        actor: auditEvent.actor,
+        action: 'USER_UPDATED',
+        target: `users/${userId}`,
+        ipAddress: auditEvent.ipAddress,
+        details: JSON.stringify({
+          changed: auditEvent.changed,
+          previous: before,
+          updated,
+          ...(auditEvent.passwordReset && { passwordReset: true }),
+        }),
+        connection: conn,
+      });
+    }
+    await conn.commit();
+    return result.affectedRows > 0;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 /**
