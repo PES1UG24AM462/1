@@ -98,7 +98,7 @@ describe('SAM-F-014 — create', () => {
 
 describe('SAM-F-014 — update / deactivate', () => {
   test('deactivates another account and audits it', async () => {
-    userModel.findById = jest.fn().mockImplementation(async (uid) => ({ user_id: uid, username: `u${uid}`, role: uid === 1 ? 'admin' : 'student', is_active: 1, full_name: 'X' }));
+    userModel.findById = jest.fn().mockImplementation(async (uid) => ({ user_id: uid, username: uid === 1 ? 'admin_user' : `u${uid}`, role: uid === 1 ? 'admin' : 'student', is_active: 1, full_name: 'X' }));
     userModel.updateUser = jest.fn().mockResolvedValue(true);
     const res = await request(app).patch('/api/admin/users/7').set('Authorization', `Bearer ${adminToken()}`).send({ isActive: false });
     expect(res.status).toBe(200);
