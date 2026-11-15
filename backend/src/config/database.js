@@ -15,6 +15,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  connectTimeout: 3000, // SAM-NF-001: fail fast instead of hanging past the 3 s target
   // Enable timezone-aware timestamps
   timezone: '+00:00',
 });
