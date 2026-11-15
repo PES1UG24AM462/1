@@ -5,7 +5,7 @@
  * Requirements covered:
  *   SAM-F-001  — Authenticate users with username + password
  *   SAM-SR-002 — Passwords verified against salted bcrypt hash; never logged
- *   SAM-SR-004 — Log LOGIN_SUCCESS and LOGIN_FAILURE to audit_log
+ *   SAM-SR-004 — Log LOGIN_SUCCESS and LOGIN_FAILED to audit_log
  *   SAM-NF-003 / SAM-SR-001 — HTTPS enforced at server/proxy level
  *
  * TC-AUTH-01: Valid credentials → 200 { token, role }
@@ -18,6 +18,22 @@ const auditModel = require('../models/auditModel');
 const { generateToken } = require('../utils/jwtHelper');
 const { verifyPassword } = require('../utils/passwordHelper');
 const { logOperationalError } = require('../utils/logOperationalError');
+
+function loginFailureAudit(req, { actor, target, failureCategory }) {
+  return auditModel.logEvent({
+    actor,
+    action: 'LOGIN_FAILED',
+    target,
+    // Only record the transport peer. X-Forwarded-For is client-controlled
+    // unless a trusted proxy is explicitly configured.
+    ipAddress: req.socket?.remoteAddress || null,
+    details: JSON.stringify({
+      outcome: 'FAILURE',
+      failureCategory,
+      requestId: req.requestId || null,
+    }),
+  });
+}
 
 /**
  * Login handler.
@@ -37,34 +53,38 @@ async function login(req, res) {
     return res.status(400).json({ message: 'Username and password are required.' });
   }
 
-  // Derive a safe client identifier for audit logging (IP address)
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
-
   try {
+    if (!/^[A-Za-z0-9_.-]{3,50}$/.test(username)) {
+      await loginFailureAudit(req, {
+        actor: null,
+        target: 'auth/login',
+        failureCategory: 'INVALID_IDENTIFIER',
+      });
+      return res.status(401).json({ message: 'Invalid username or password.' });
+    }
+
     // 1. Look up the user
     const user = await userModel.findByUsername(username);
 
     // 2. User not found — use a generic error to prevent username enumeration
     if (!user) {
       // SAM-SR-004: record the failed attempt
-      await auditModel.logEvent({
-        actor: null,
-        action: 'LOGIN_FAILURE',
-        target: `users/${username}`,
-        ipAddress: clientIp,
-        details: 'Username not found',
+      await loginFailureAudit(req, {
+        // An unknown account name is an attempted actor, not an authenticated
+        // identity. Keep it out of the target and bound it to the audit schema.
+        actor: username,
+        target: 'auth/login',
+        failureCategory: 'INVALID_CREDENTIALS',
       });
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
 
     // 3. Account must be active
     if (!user.is_active) {
-      await auditModel.logEvent({
-        actor: username,
-        action: 'LOGIN_FAILURE',
+      await loginFailureAudit(req, {
+        actor: user.username,
         target: `users/${user.user_id}`,
-        ipAddress: clientIp,
-        details: 'Account is deactivated',
+        failureCategory: 'ACCOUNT_INACTIVE',
       });
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
@@ -75,12 +95,10 @@ async function login(req, res) {
 
     if (!passwordMatch) {
       // SAM-SR-004: log failure — do NOT log the attempted password
-      await auditModel.logEvent({
-        actor: username,
-        action: 'LOGIN_FAILURE',
+      await loginFailureAudit(req, {
+        actor: user.username,
         target: `users/${user.user_id}`,
-        ipAddress: clientIp,
-        details: 'Incorrect password',
+        failureCategory: 'INVALID_CREDENTIALS',
       });
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
@@ -97,7 +115,7 @@ async function login(req, res) {
       actor: user.username,
       action: 'LOGIN_SUCCESS',
       target: `users/${user.user_id}`,
-      ipAddress: clientIp,
+      ipAddress: req.socket?.remoteAddress || null,
       details: null,
     });
 

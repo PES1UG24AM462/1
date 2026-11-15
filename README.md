@@ -115,7 +115,7 @@ Tests mock the database layer and run without a live MySQL instance.
 |--------|------------|--------|
 | SAM-F-001 | Authenticate users with username + password | ✅ Implemented |
 | SAM-SR-002 | Passwords stored as salted bcrypt hash | ✅ Implemented |
-| SAM-SR-004 | Login success/failure recorded in audit log | ✅ Implemented |
+| SAM-SR-004 | Failed login attempts, attendance corrections, and administrative changes are audited (AC-SAM-SR-004; TC-AUD-01) | Implemented; see [docs/security-audit.md](docs/security-audit.md) |
 | SAM-NF-003 | HTTPS/TLS enforced (via Helmet + proxy) | ✅ Implemented |
 | SAM-F-002 | RBAC middleware for protected routes | ✅ Implemented |
 | SAM-F-003 | Faculty selects an assigned class and valid attendance date (TC-ATT-01) | ✅ Implemented |
@@ -126,6 +126,8 @@ Tests mock the database layer and run without a live MySQL instance.
 | SAM-NF-006 | Retain audit records for at least one academic year or configured institutional period (TC-AUD-02) | Append-only database guards; automatic deletion disabled pending confirmation of institutional policy |
 
 Availability measurement and the operational dependencies for SAM-NF-002 are documented in [docs/availability.md](docs/availability.md).
+
+Security-relevant login, attendance-correction, and administrative audit behavior for SAM-SR-004 / TC-AUD-01 is documented in [docs/security-audit.md](docs/security-audit.md). The source SRS PDF and issue #39 differ on the printed requirement number; see the traceability note in that document.
 
 ---
 

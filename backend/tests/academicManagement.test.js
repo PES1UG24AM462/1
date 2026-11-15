@@ -3,6 +3,7 @@
 jest.mock('../src/models/academicModel');
 jest.mock('../src/models/userModel');
 jest.mock('../src/models/auditModel');
+jest.mock('../src/config/database', () => ({ pool: { getConnection: jest.fn() } }));
 
 process.env.JWT_SECRET = 'test_secret_that_is_long_enough_for_hs256_minimum';
 process.env.JWT_EXPIRES_IN = '1h';
@@ -13,8 +14,10 @@ const app = require('../src/server');
 const academicModel = require('../src/models/academicModel');
 const userModel = require('../src/models/userModel');
 const auditModel = require('../src/models/auditModel');
+const { pool } = require('../src/config/database');
 const { generateToken } = require('../src/utils/jwtHelper');
 
+let transactionConnection;
 const token = (role, userId = 1) => generateToken({ userId, username: `${role}${userId}`, role });
 const auth = (role = 'admin', userId = 1) => ({ Authorization: `Bearer ${token(role, userId)}` });
 const knownClass = { classId: 12, courseId: 3, facultyId: 7, courseCode: 'CS301', courseName: 'Databases', section: 'A', academicYear: '2026-27', facultyName: 'Dr Rao' };
@@ -27,6 +30,14 @@ function authenticateAs(role, userId = 1) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  transactionConnection = {
+    beginTransaction: jest.fn().mockResolvedValue(undefined),
+    commit: jest.fn().mockResolvedValue(undefined),
+    rollback: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn(),
+    execute: jest.fn(),
+  };
+  pool.getConnection.mockResolvedValue(transactionConnection);
   authenticateAs('admin');
   auditModel.logEvent = jest.fn().mockResolvedValue(undefined);
 });
@@ -45,6 +56,7 @@ describe('SAM-F-015 authorization', () => {
     authenticateAs(role);
     const response = await request(app)[method](path).set(auth(role)).send(body);
     expect(response.status).toBe(403);
+    expect(auditModel.logEvent).not.toHaveBeenCalled();
   });
 
   test('uses the database role instead of the role in a submitted token', async () => {
@@ -73,8 +85,11 @@ describe('course management', () => {
       courseCode: ' CS301 ', courseName: ' Databases ', description: '', credits: 4,
     });
     expect(response.status).toBe(201);
-    expect(academicModel.createCourse).toHaveBeenCalledWith({ courseCode: 'CS301', courseName: 'Databases', description: null, credits: 4 });
-    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'COURSE_CREATED', target: 'courses/3' }));
+    expect(academicModel.createCourse).toHaveBeenCalledWith({ courseCode: 'CS301', courseName: 'Databases', description: null, credits: 4 }, transactionConnection);
+    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actor: 'admin1', action: 'COURSE_CREATED', target: 'courses/3', connection: transactionConnection,
+    }));
+    expect(transactionConnection.commit).toHaveBeenCalledTimes(1);
   });
 
   test.each([
@@ -96,6 +111,22 @@ describe('course management', () => {
     expect(response.status).toBe(409);
   });
 
+  test('rolls a course change back when its required audit event cannot be persisted', async () => {
+    academicModel.createCourse = jest.fn().mockResolvedValue(33);
+    auditModel.logEvent.mockRejectedValue(new Error('audit unavailable'));
+
+    const response = await request(app).post('/api/admin/courses').set(auth())
+      .send({ courseCode: 'CS330', courseName: 'Auditing' });
+
+    expect(response.status).toBe(500);
+    expect(academicModel.createCourse).toHaveBeenCalledWith(
+      { courseCode: 'CS330', courseName: 'Auditing', description: null, credits: null },
+      transactionConnection
+    );
+    expect(transactionConnection.rollback).toHaveBeenCalledTimes(1);
+    expect(transactionConnection.commit).not.toHaveBeenCalled();
+  });
+
   test('updates allowed course fields and returns 404 for a missing course', async () => {
     academicModel.getCourseById = jest.fn()
       .mockResolvedValueOnce({ courseId: 3 })
@@ -104,7 +135,10 @@ describe('course management', () => {
     academicModel.updateCourse = jest.fn().mockResolvedValue(true);
     const updated = await request(app).patch('/api/admin/courses/3').set(auth()).send({ courseCode: 'CS302', courseName: 'Databases II' });
     expect(updated.status).toBe(200);
-    expect(academicModel.updateCourse).toHaveBeenCalledWith(3, { courseCode: 'CS302', courseName: 'Databases II' });
+    expect(academicModel.updateCourse).toHaveBeenCalledWith(3, { courseCode: 'CS302', courseName: 'Databases II' }, transactionConnection);
+    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actor: 'admin1', action: 'COURSE_UPDATED', target: 'courses/3', connection: transactionConnection,
+    }));
     const missing = await request(app).patch('/api/admin/courses/99').set(auth()).send({ courseName: 'Missing' });
     expect(missing.status).toBe(404);
   });
@@ -128,8 +162,10 @@ describe('class management', () => {
     academicModel.getClassById = jest.fn().mockResolvedValue(knownClass);
     const response = await request(app).post('/api/admin/classes').set(auth()).send({ courseId: '3', facultyId: 7, section: 'A', academicYear: '2026-27' });
     expect(response.status).toBe(201);
-    expect(academicModel.createClass).toHaveBeenCalledWith({ courseId: 3, facultyId: 7, section: 'A', academicYear: '2026-27' });
-    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'CLASS_CREATED', target: 'classes/12' }));
+    expect(academicModel.createClass).toHaveBeenCalledWith({ courseId: 3, facultyId: 7, section: 'A', academicYear: '2026-27' }, transactionConnection);
+    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actor: 'admin1', action: 'CLASS_CREATED', target: 'classes/12', connection: transactionConnection,
+    }));
   });
 
   test('rejects nonexistent course and faculty references', async () => {
@@ -149,7 +185,7 @@ describe('class management', () => {
     expect(invalid.status).toBe(400);
     const updated = await request(app).patch('/api/admin/classes/12').set(auth()).send({ facultyId: 8, section: 'B' });
     expect(updated.status).toBe(200);
-    expect(academicModel.updateClass).toHaveBeenCalledWith(12, { facultyId: 8, section: 'B' });
+    expect(academicModel.updateClass).toHaveBeenCalledWith(12, { facultyId: 8, section: 'B' }, transactionConnection);
   });
 });
 
@@ -161,8 +197,10 @@ describe('student enrollments', () => {
     const response = await request(app).post('/api/admin/classes/12/enrollments').set(auth()).send({ studentId: 21 });
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({ enrollmentId: 51, classId: 12, studentId: 21 });
-    expect(academicModel.enrollStudent).toHaveBeenCalledWith(21, 12);
-    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'STUDENT_ENROLLED', target: 'enrollments/51' }));
+    expect(academicModel.enrollStudent).toHaveBeenCalledWith(21, 12, transactionConnection);
+    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actor: 'admin1', action: 'STUDENT_ENROLLED', target: 'enrollments/51', connection: transactionConnection,
+    }));
   });
 
   test('rejects missing students and classes', async () => {

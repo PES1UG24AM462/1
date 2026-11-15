@@ -5,6 +5,7 @@
 
 const academicModel = require('../models/academicModel');
 const auditModel = require('../models/auditModel');
+const { pool } = require('../config/database');
 const { logOperationalError } = require('../utils/logOperationalError');
 
 function parseId(value) {
@@ -24,7 +25,34 @@ function text(value) {
 }
 
 function clientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  return req.socket?.remoteAddress || null;
+}
+
+async function auditedMutation(req, res, { action, target, details }, mutate) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await mutate(connection);
+    await auditModel.logEvent({
+      actor: req.user.username,
+      action,
+      target: typeof target === 'function' ? target(result) : target,
+      ipAddress: clientIp(req),
+      details,
+      connection,
+    });
+    await connection.commit();
+    return result;
+  } catch (err) {
+    try {
+      await connection.rollback();
+    } catch (rollbackError) {
+      logOperationalError('academic.audit_rollback_failed', rollbackError, res);
+    }
+    throw err;
+  } finally {
+    connection.release();
+  }
 }
 
 function validKeys(body, keys) {
@@ -137,11 +165,10 @@ async function createCourse(req, res) {
   const validation = validateCourseFields(req.body);
   if (validation.error) return res.status(400).json({ message: validation.error });
   try {
-    const courseId = await academicModel.createCourse(validation.fields);
-    await auditModel.logEvent({
-      actor: req.user.username, action: 'COURSE_CREATED', target: `courses/${courseId}`,
-      ipAddress: clientIp(req), details: JSON.stringify({ courseCode: validation.fields.courseCode }),
-    });
+    const courseId = await auditedMutation(req, res, {
+      action: 'COURSE_CREATED', target: (id) => `courses/${id}`,
+      details: JSON.stringify({ courseCode: validation.fields.courseCode }),
+    }, (connection) => academicModel.createCourse(validation.fields, connection));
     const course = await academicModel.getCourseById(courseId);
     return res.status(201).json({ message: 'Course created.', course });
   } catch (err) {
@@ -157,11 +184,10 @@ async function updateCourse(req, res) {
   try {
     const existing = await academicModel.getCourseById(courseId);
     if (!existing) return res.status(404).json({ message: 'Course not found.' });
-    await academicModel.updateCourse(courseId, validation.fields);
-    await auditModel.logEvent({
-      actor: req.user.username, action: 'COURSE_UPDATED', target: `courses/${courseId}`,
-      ipAddress: clientIp(req), details: JSON.stringify({ changed: Object.keys(validation.fields) }),
-    });
+    await auditedMutation(req, res, {
+      action: 'COURSE_UPDATED', target: `courses/${courseId}`,
+      details: JSON.stringify({ changed: Object.keys(validation.fields) }),
+    }, (connection) => academicModel.updateCourse(courseId, validation.fields, connection));
     return res.status(200).json({ message: 'Course updated.', course: await academicModel.getCourseById(courseId) });
   } catch (err) {
     return handleDatabaseError(err, res, 'course update');
@@ -210,11 +236,10 @@ async function createClass(req, res) {
   if (validation.error) return res.status(400).json({ message: validation.error });
   try {
     if (!(await validateRelationships(validation.fields, res))) return undefined;
-    const classId = await academicModel.createClass(validation.fields);
-    await auditModel.logEvent({
-      actor: req.user.username, action: 'CLASS_CREATED', target: `classes/${classId}`,
-      ipAddress: clientIp(req), details: JSON.stringify({ courseId: validation.fields.courseId, facultyId: validation.fields.facultyId }),
-    });
+    const classId = await auditedMutation(req, res, {
+      action: 'CLASS_CREATED', target: (id) => `classes/${id}`,
+      details: JSON.stringify({ courseId: validation.fields.courseId, facultyId: validation.fields.facultyId }),
+    }, (connection) => academicModel.createClass(validation.fields, connection));
     return res.status(201).json({ message: 'Class created.', class: await academicModel.getClassById(classId) });
   } catch (err) {
     return handleDatabaseError(err, res, 'class creation');
@@ -230,11 +255,10 @@ async function updateClass(req, res) {
     const existing = await academicModel.getClassById(classId);
     if (!existing) return res.status(404).json({ message: 'Class not found.' });
     if (!(await validateRelationships(validation.fields, res))) return undefined;
-    await academicModel.updateClass(classId, validation.fields);
-    await auditModel.logEvent({
-      actor: req.user.username, action: 'CLASS_UPDATED', target: `classes/${classId}`,
-      ipAddress: clientIp(req), details: JSON.stringify({ changed: Object.keys(validation.fields) }),
-    });
+    await auditedMutation(req, res, {
+      action: 'CLASS_UPDATED', target: `classes/${classId}`,
+      details: JSON.stringify({ changed: Object.keys(validation.fields) }),
+    }, (connection) => academicModel.updateClass(classId, validation.fields, connection));
     return res.status(200).json({ message: 'Class updated.', class: await academicModel.getClassById(classId) });
   } catch (err) {
     return handleDatabaseError(err, res, 'class update');
@@ -280,11 +304,10 @@ async function enrollStudent(req, res) {
     if (!(await academicModel.getStudentById(studentId))) {
       return res.status(404).json({ message: 'Student not found.' });
     }
-    const enrollmentId = await academicModel.enrollStudent(studentId, classId);
-    await auditModel.logEvent({
-      actor: req.user.username, action: 'STUDENT_ENROLLED', target: `enrollments/${enrollmentId}`,
-      ipAddress: clientIp(req), details: JSON.stringify({ studentId, classId }),
-    });
+    const enrollmentId = await auditedMutation(req, res, {
+      action: 'STUDENT_ENROLLED', target: (id) => `enrollments/${id}`,
+      details: JSON.stringify({ studentId, classId }),
+    }, (connection) => academicModel.enrollStudent(studentId, classId, connection));
     return res.status(201).json({ message: 'Student enrolled.', enrollmentId, classId, studentId });
   } catch (err) {
     return handleDatabaseError(err, res, 'student enrollment');

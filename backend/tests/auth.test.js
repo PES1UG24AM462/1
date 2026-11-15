@@ -42,6 +42,8 @@ beforeEach(() => {
   auditModel.logEvent = jest.fn().mockResolvedValue(undefined);
 });
 
+afterEach(() => jest.restoreAllMocks());
+
 // ─── TC-AUTH-01: Valid Login ─────────────────────────────────────────────────
 describe('TC-AUTH-01 — SAM-F-001: Sign in with username and password', () => {
   test('should return 200 with token and role for valid credentials', async () => {
@@ -89,10 +91,18 @@ describe('TC-AUTH-01 — SAM-F-001: Sign in with username and password', () => {
     // Generic message — must not reveal whether the username exists
     expect(res.body.message).toBe('Invalid username or password.');
 
-    // SAM-SR-004: failure must be audited
-    expect(auditModel.logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'LOGIN_FAILURE' })
-    );
+    // SAM-SR-004: failed-login audit metadata comes from the server, not body fields.
+    const event = auditModel.logEvent.mock.calls[0][0];
+    expect(event).toEqual(expect.objectContaining({
+      actor: 'faculty1', action: 'LOGIN_FAILED', target: 'users/1',
+    }));
+    expect(JSON.parse(event.details)).toEqual({
+      outcome: 'FAILURE',
+      failureCategory: 'INVALID_CREDENTIALS',
+      requestId: res.headers['x-request-id'],
+    });
+    expect(JSON.stringify(event)).not.toContain('WrongPassword!');
+    expect(JSON.stringify(event)).not.toContain(validHash);
   });
 
   // ─── TC-AUTH-01: Unknown username ─────────────────────────────────────────
@@ -101,10 +111,69 @@ describe('TC-AUTH-01 — SAM-F-001: Sign in with username and password', () => {
 
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'nobody', password: 'whatever' });
+      .send({
+        username: 'nobody', password: 'whatever', actor: 'admin1',
+        action: 'LOGIN_SUCCESS', createdAt: '2099-01-01 00:00:00',
+      });
 
     expect(res.status).toBe(401);
     expect(res.body.message).toBe('Invalid username or password.');
+    const event = auditModel.logEvent.mock.calls[0][0];
+    expect(event).toEqual(expect.objectContaining({
+      actor: 'nobody', action: 'LOGIN_FAILED', target: 'auth/login',
+    }));
+    expect(event).not.toHaveProperty('createdAt');
+    expect(event.details).not.toContain('whatever');
+    expect(event.details).not.toContain('2099-01-01');
+  });
+
+  test('records repeated failed logins as separate events without duplicating secrets', async () => {
+    userModel.findByUsername = jest.fn().mockResolvedValue(null);
+
+    await request(app).post('/api/auth/login').send({ username: 'missing', password: 'bad-one' });
+    await request(app).post('/api/auth/login').send({ username: 'missing', password: 'bad-two' });
+
+    expect(auditModel.logEvent).toHaveBeenCalledTimes(2);
+    const events = auditModel.logEvent.mock.calls.map(([event]) => event);
+    expect(events.every((event) => event.action === 'LOGIN_FAILED')).toBe(true);
+    expect(events.map((event) => JSON.parse(event.details).requestId)).toEqual([
+      expect.any(String), expect.any(String),
+    ]);
+    expect(JSON.parse(events[0].details).requestId).not.toBe(JSON.parse(events[1].details).requestId);
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain('bad-one');
+    expect(serialized).not.toContain('bad-two');
+  });
+
+  test('records malformed account identifiers without persisting their raw value', async () => {
+    const invalidIdentifier = 'bad\nidentifier';
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ username: invalidIdentifier, password: 'not-logged' });
+
+    expect(res.status).toBe(401);
+    expect(userModel.findByUsername).not.toHaveBeenCalled();
+    const event = auditModel.logEvent.mock.calls[0][0];
+    expect(event).toEqual(expect.objectContaining({
+      actor: null, action: 'LOGIN_FAILED', target: 'auth/login',
+    }));
+    expect(JSON.parse(event.details).failureCategory).toBe('INVALID_IDENTIFIER');
+    expect(JSON.stringify(event)).not.toContain('bad');
+    expect(JSON.stringify(event)).not.toContain('not-logged');
+  });
+
+  test('returns a generic server error when a failed-login audit cannot be persisted', async () => {
+    userModel.findByUsername = jest.fn().mockResolvedValue(null);
+    auditModel.logEvent.mockRejectedValue(new Error('database unavailable'));
+    const operationalLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await request(app).post('/api/auth/login')
+      .send({ username: 'nobody', password: 'do-not-log-this' });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('An internal server error occurred. Please try again.');
+    expect(JSON.stringify(res.body)).not.toContain('do-not-log-this');
+    expect(operationalLog.mock.calls.flat().join(' ')).not.toContain('do-not-log-this');
   });
 
   // ─── TC-AUTH-02: Deactivated account ─────────────────────────────────────
@@ -124,6 +193,10 @@ describe('TC-AUTH-01 — SAM-F-001: Sign in with username and password', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.message).toBe('Invalid username or password.');
+    expect(auditModel.logEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actor: 'old_student', action: 'LOGIN_FAILED', target: 'users/5',
+      details: expect.stringContaining('ACCOUNT_INACTIVE'),
+    }));
   });
 
   // ─── Missing fields ───────────────────────────────────────────────────────

@@ -62,15 +62,22 @@ describe('SAM-F-014 — create', () => {
   test('creates a student, hashes the password, audits the change', async () => {
     loginAs('admin');
     userModel.createUser = jest.fn().mockResolvedValue(42);
-    const res = await request(app).post('/api/admin/users').set('Authorization', `Bearer ${adminToken()}`).send(validStudent);
+    const res = await request(app).post('/api/admin/users').set('Authorization', `Bearer ${adminToken()}`)
+      .send({ ...validStudent, actor: 'spoofed-actor', createdAt: '2099-01-01 00:00:00' });
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe(42);
     const arg = userModel.createUser.mock.calls[0][0];
     expect(arg.passwordHash).toMatch(/^\$2[aby]\$/);
     expect(arg.passwordHash).not.toContain('Passw0rd!x');
     expect(arg.usn).toBe('PES1UG24AM900');
-    expect(arg.auditEvent).toEqual(expect.objectContaining({ action: 'USER_CREATED', target: 'users/pending' }));
+    expect(arg.auditEvent).toEqual(expect.objectContaining({
+      actor: 'admin1', action: 'USER_CREATED', target: 'users/pending',
+    }));
+    expect(arg.auditEvent).not.toHaveProperty('createdAt');
     expect(JSON.stringify(arg.auditEvent)).not.toContain('Passw0rd!x');
+    expect(JSON.parse(arg.auditEvent.details)).toEqual({ role: 'student' });
+    expect(JSON.stringify(arg.auditEvent)).not.toContain(validStudent.usn);
+    expect(JSON.stringify(arg.auditEvent)).not.toContain(validStudent.email);
   });
 
   test.each([
@@ -104,7 +111,7 @@ describe('SAM-F-014 — update / deactivate', () => {
     expect(res.status).toBe(200);
     expect(userModel.updateUser).toHaveBeenCalledWith(7, expect.objectContaining({ isActive: false }), expect.objectContaining({
       actor: 'admin_user',
-      changes: expect.objectContaining({ isActive: false }),
+      changed: ['deactivated'],
     }));
   });
 
