@@ -8,6 +8,7 @@
 
 const { verifyToken } = require('../utils/jwtHelper');
 const userModel = require('../models/userModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 /**
  * authenticate
@@ -51,7 +52,7 @@ async function authenticate(req, res, next) {
     };
     return next();
   } catch (err) {
-    console.error('[Auth] Account lookup failed:', err.message);
+    logOperationalError('auth.account_lookup_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }

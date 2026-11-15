@@ -1,4 +1,5 @@
 const auditModel = require('../models/auditModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 function listAuditEvents(req, res) {
   const { action, actor } = req.query;
@@ -20,7 +21,7 @@ function listAuditEvents(req, res) {
   })
     .then((events) => res.status(200).json({ events, limit, offset }))
     .catch((err) => {
-      console.error('[Audit] History lookup failed:', err.message);
+      logOperationalError('audit.history_lookup_failed', err, res);
       return res.status(500).json({ message: 'Unable to load audit history. Please try again.' });
     });
 }

@@ -15,6 +15,7 @@
 
 const percentageModel = require('../models/percentageModel');
 const studentModel = require('../models/studentModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 /**
  * getAttendancePercentage
@@ -53,7 +54,7 @@ async function getAttendancePercentage(req, res) {
 
     return res.status(200).json({ percentages });
   } catch (err) {
-    console.error('[Percentage] Calculation failed:', err.message);
+    logOperationalError('attendance.percentage_failed', err, res);
     return res
       .status(500)
       .json({ message: 'Unable to calculate attendance percentage. Please try again.' });

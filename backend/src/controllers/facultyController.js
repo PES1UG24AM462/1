@@ -1,4 +1,5 @@
 const facultyModel = require('../models/facultyModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 function parseClassId(value) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -22,7 +23,7 @@ async function getAssignedClasses(req, res) {
     const classes = await facultyModel.listAssignedClasses(req.user.userId);
     return res.status(200).json({ classes });
   } catch (err) {
-    console.error('[Faculty] Assigned class lookup failed:', err.message);
+    logOperationalError('faculty.assigned_classes_failed', err, res);
     return res.status(500).json({ message: 'Unable to load assigned classes. Please try again.' });
   }
 }
@@ -58,7 +59,7 @@ async function getClassRoster(req, res) {
       students: selectedClass.students,
     });
   } catch (err) {
-    console.error('[Faculty] Class roster lookup failed:', err.message);
+    logOperationalError('faculty.class_roster_failed', err, res);
     return res.status(500).json({ message: 'Unable to load this class roster. Please try again.' });
   }
 }

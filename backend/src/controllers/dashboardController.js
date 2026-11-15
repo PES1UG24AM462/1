@@ -13,6 +13,7 @@
 
 const dashboardModel = require('../models/dashboardModel');
 const { attendanceThreshold } = require('../config/attendancePolicy');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 async function getDashboardSummary(req, res) {
   const { role, userId } = req.user;
@@ -38,7 +39,7 @@ async function getDashboardSummary(req, res) {
     return res.status(400).json({ message: 'Unknown role.' });
 
   } catch (err) {
-    console.error('[Dashboard] Summary query failed:', err.message);
+    logOperationalError('dashboard.summary_failed', err, res);
     return res.status(500).json({ message: 'Unable to load dashboard summary. Please try again.' });
   }
 }
