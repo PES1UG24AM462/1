@@ -248,7 +248,6 @@ async function verifyDatabaseWithRetry({
 }
 
 async function start() {
-  validateStartupConfiguration();
   const keyPath = process.env.TLS_KEY_PATH;
   const certPath = process.env.TLS_CERT_PATH;
   if (Boolean(keyPath) !== Boolean(certPath)) {
@@ -257,6 +256,7 @@ async function start() {
   if (isProduction && !keyPath && !trustedProxyIps.length) {
     throw new Error('Production requires direct TLS certificate paths or explicitly trusted TLS proxy IPs.');
   }
+  validateStartupConfiguration();
 
   const tlsOptions = keyPath
     ? {

@@ -107,7 +107,7 @@ npm test
 
 Tests mock the database layer and run without a live MySQL instance.
 
-## Production HTTPS/TLS (SAM-SR-001)
+## Production HTTPS/TLS (SAM-SR-001 / SAM-NF-003)
 
 Approved requirement SAM-SR-001: "The system shall enforce HTTPS/TLS for all
 authenticated network communication." Related requirement SAM-NF-003 is "Use
@@ -141,7 +141,6 @@ rejection, trusted-proxy handling, CORS, security headers, and TLS server
 configuration. They do not perform a live TLS handshake or scan a deployed
 endpoint; run TC-SEC-01 against the configured production deployment before
 recording the criterion as verified.
-
 ---
 
 ## Requirements Traceability
