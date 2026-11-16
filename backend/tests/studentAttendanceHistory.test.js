@@ -23,8 +23,8 @@ const expectedRecords = [{
   section: 'A',
 }];
 
-function tokenFor(userId = 7, role = 'student') {
-  return generateToken({ userId, username: `${role}${userId}`, role });
+function tokenFor(userId = 7, role = 'student', claims = {}) {
+  return generateToken({ userId, username: `${role}${userId}`, role, ...claims });
 }
 
 function authenticateAs(role = 'student', userId = 7) {
@@ -54,6 +54,44 @@ describe('SAM-F-008: student attendance history (TC-STU-01)', () => {
     expect(response.status).toBe(200);
     expect(response.body.records).toEqual(expectedRecords);
     expect(studentModel.getAttendanceHistory).toHaveBeenCalledWith(7, 4, '2026-10-20');
+  });
+
+  test('TC-SEC-04: changing URL, query, or token student IDs cannot return another student history', async () => {
+    const recordsByUser = {
+      7: [{ attendance_id: 101, student_id: 101, status: 'Present' }],
+      8: [{ attendance_id: 202, student_id: 202, status: 'Absent' }],
+    };
+    studentModel.getAttendanceHistory.mockImplementation(async (userId) => recordsByUser[userId]);
+    authenticateAs('student', 7);
+    const studentAToken = tokenFor(7, 'student', { studentId: 202 });
+
+    const studentA = await request(app)
+      .get('/api/student/attendance/history?studentId=202&userId=8')
+      .set('Authorization', `Bearer ${studentAToken}`);
+    const studentB = await request(app)
+      .get('/api/student/attendance/history')
+      .set('Authorization', `Bearer ${authenticateAs('student', 8)}`);
+
+    expect(studentA.status).toBe(200);
+    expect(studentA.body.records).toEqual(recordsByUser[7]);
+    expect(studentB.status).toBe(200);
+    expect(studentB.body.records).toEqual(recordsByUser[8]);
+    expect(studentModel.getAttendanceHistory).toHaveBeenNthCalledWith(1, 7, null, null);
+    expect(studentModel.getAttendanceHistory).toHaveBeenNthCalledWith(2, 8, null, null);
+  });
+
+  test('student IDs in URL paths or request bodies do not reach attendance queries', async () => {
+    const pathResponse = await request(app)
+      .get('/api/students/202/attendance')
+      .set('Authorization', `Bearer ${authenticateAs()}`);
+    const bodyResponse = await request(app)
+      .post('/api/student/attendance/history')
+      .send({ studentId: 202 })
+      .set('Authorization', `Bearer ${authenticateAs()}`);
+
+    expect(pathResponse.status).toBe(404);
+    expect(bodyResponse.status).toBe(404);
+    expect(studentModel.getAttendanceHistory).not.toHaveBeenCalled();
   });
 
   test('omitted filters return the authenticated student history without a date limit', async () => {

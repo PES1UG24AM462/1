@@ -16,6 +16,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const app = require('../src/server');
 const reportModel = require('../src/models/reportModel');
+const attendanceModel = require('../src/models/attendanceModel');
 const auditModel = require('../src/models/auditModel');
 const userModel = require('../src/models/userModel');
 
@@ -196,6 +197,29 @@ test('student and unauthenticated users cannot access attendance reports', async
   expect(studentResponse.status).toBe(403);
   expect(anonymousResponse.status).toBe(401);
   expect(reportModel.getAttendanceRows).not.toHaveBeenCalled();
+});
+
+test.each([
+  '/api/reports/classes',
+  '/api/reports/students?classId=10',
+  '/api/reports/attendance?courseId=3&classId=10&from=2026-10-01&to=2026-10-31&studentId=2',
+  '/api/reports/attendance/export?courseId=3&classId=10&from=2026-10-01&to=2026-10-31&studentId=2',
+  '/api/reports/low-attendance?classId=10',
+])('student cannot use report endpoint %s to access class-wide or selected-student data', async (path) => {
+  userModel.findById.mockResolvedValue({
+    user_id: 3, username: 'student1', role: 'student', is_active: 1,
+  });
+
+  const response = await request(app)
+    .get(path)
+    .set('Authorization', `Bearer ${tokenFor(3, 'student')}`);
+
+  expect(response.status).toBe(403);
+  expect(response.body).not.toHaveProperty('students');
+  expect(reportModel.listReportClasses).not.toHaveBeenCalled();
+  expect(reportModel.listReportStudents).not.toHaveBeenCalled();
+  expect(reportModel.getAttendanceRows).not.toHaveBeenCalled();
+  expect(attendanceModel.getStudentsBelowThreshold).not.toHaveBeenCalled();
 });
 
 test('report class selection uses actual role-scoped database classes', async () => {

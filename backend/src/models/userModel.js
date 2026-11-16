@@ -170,7 +170,7 @@ async function updateUser(userId, { fullName, email, isActive, passwordHash }, a
   try {
     await conn.beginTransaction();
     const [rows] = await conn.execute(
-      `SELECT username, role, full_name AS fullName, email, is_active AS isActive
+      `SELECT user_id
        FROM users WHERE user_id = ? FOR UPDATE`,
       [userId]
     );
@@ -181,12 +181,6 @@ async function updateUser(userId, { fullName, email, isActive, passwordHash }, a
     }
     const [result] = await conn.execute(`UPDATE users SET ${sets.join(', ')} WHERE user_id = ?`, values);
     if (result.affectedRows > 0) {
-      const updated = {};
-      for (const field of ['fullName', 'email', 'isActive']) {
-        if (auditEvent.changes[field] !== undefined) updated[field] = auditEvent.changes[field];
-      }
-      const before = {};
-      for (const field of Object.keys(updated)) before[field] = previous[field];
       await auditModel.logEvent({
         actor: auditEvent.actor,
         action: 'USER_UPDATED',
@@ -194,8 +188,6 @@ async function updateUser(userId, { fullName, email, isActive, passwordHash }, a
         ipAddress: auditEvent.ipAddress,
         details: JSON.stringify({
           changed: auditEvent.changed,
-          previous: before,
-          updated,
           ...(auditEvent.passwordReset && { passwordReset: true }),
         }),
         connection: conn,

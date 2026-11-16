@@ -14,7 +14,7 @@ const { pool } = require('../config/database');
  *
  * @param {Object} params
  * @param {string|null} params.actor     - username or user_id of the acting principal (null for anonymous)
- * @param {string}      params.action    - short action label, e.g. 'LOGIN_SUCCESS', 'LOGIN_FAILURE'
+ * @param {string}      params.action    - short action label, e.g. 'LOGIN_SUCCESS', 'LOGIN_FAILED'
  * @param {string}      params.target    - resource or entity affected, e.g. 'users/42'
  * @param {string|null} params.ipAddress - client IP address for security events
  * @param {string|null} params.details   - optional JSON-serialisable detail string
@@ -60,11 +60,21 @@ async function logEvent({
 }
 
 /** Return a paginated audit history for the protected administrator view. */
-async function listEvents({ action = null, actor = null, limit = 50, offset = 0 } = {}) {
+async function listEvents({ action = null, actor = null, startDate = null, endDate = null, limit = 50, offset = 0 } = {}) {
   const conditions = [];
   const parameters = [];
   if (action !== null) { conditions.push('action = ?'); parameters.push(action); }
   if (actor !== null) { conditions.push('actor = ?'); parameters.push(actor); }
+  if (startDate !== null) {
+    conditions.push('created_at >= ?');
+    parameters.push(`${startDate} 00:00:00`);
+  }
+  if (endDate !== null) {
+    // audit_log.created_at has second precision, so this includes the full
+    // final UTC date without a client-controlled timestamp.
+    conditions.push('created_at <= ?');
+    parameters.push(`${endDate} 23:59:59`);
+  }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const [rows] = await pool.execute(

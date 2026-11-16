@@ -12,11 +12,11 @@
 require('dotenv').config();
 
 const http = require('http');
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-const fs = require('fs');
-const https = require('https');
 const compression = require('compression');
 const responseTime = require('./middleware/responseTime');
 const requestId = require('./middleware/requestId');
@@ -45,7 +45,7 @@ const trustedProxyIps = (process.env.TRUSTED_PROXY_IPS || '')
   .map((ip) => ip.trim())
   .filter(Boolean);
 
-// Forwarded protocol headers are trusted only from explicitly configured proxy IPs.
+// Forwarded protocol headers are trusted only from explicitly configured proxies.
 if (trustedProxyIps.length) app.set('trust proxy', trustedProxyIps);
 
 function positiveIntegerEnv(name, fallback, maximum) {
@@ -64,11 +64,6 @@ let shutdownPromise;
 // This supports SAM-NF-003 / SAM-SR-001 (HTTPS/TLS enforcement at proxy level)
 app.use(helmet({ hsts: false }));
 
-// SAM-NF-001: measure every request and gzip responses to keep payloads small
-app.use(requestId);
-app.use(responseTime);
-app.use(compression());
-
 // Do not redirect API requests: redirects can replay or expose sensitive POST bodies.
 // Reject before body parsing so credentials and other payloads are never processed.
 app.use((req, res, next) => {
@@ -80,6 +75,11 @@ app.use((req, res, next) => {
   }
   return next();
 });
+
+// SAM-NF-001: measure every request and gzip responses to keep payloads small
+app.use(requestId);
+app.use(responseTime);
+app.use(compression());
 
 // CORS — restrict to the React dev server and production origin
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || (isProduction ? '' : 'http://localhost:3000'))
@@ -112,7 +112,9 @@ app.use(
         callback(err);
       }
     },
-    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: false,
   })
 );
 
@@ -255,17 +257,19 @@ async function start() {
     throw new Error('Production requires direct TLS certificate paths or explicitly trusted TLS proxy IPs.');
   }
   validateStartupConfiguration();
-  await verifyDatabaseWithRetry();
 
-  if (keyPath && certPath) {
-    server = https.createServer({
+  const tlsOptions = keyPath
+    ? {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
       minVersion: 'TLSv1.2',
-    }, app);
-  } else {
-    server = http.createServer(app);
-  }
+    }
+    : null;
+
+  await verifyDatabaseWithRetry();
+  server = tlsOptions
+    ? https.createServer(tlsOptions, app)
+    : http.createServer(app);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(PORT, resolve);
@@ -273,6 +277,7 @@ async function start() {
   logger.info('server.started', {
     port: server.address().port,
     environment: process.env.NODE_ENV || 'development',
+    transport: tlsOptions ? 'https' : 'http',
   });
   return server;
 }

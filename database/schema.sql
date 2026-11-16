@@ -127,11 +127,15 @@ CREATE TABLE IF NOT EXISTS attendance (
 -- ─── Audit Log ──────────────────────────────────────────────────────────────
 -- SAM-F-016  / SAM-SR-004: All security-relevant events, attendance corrections,
 --            and admin changes are recorded here.
--- SAM-NF-006: Retained for at least one academic year.
+-- SAM-NF-006: Retained for at least one academic year or the configured
+--            institutional period. Keep this table append-only; apply
+--            database/migrations/20261115_audit_log_append_only.sql as well.
+-- Audit targets are stored as identifiers (not foreign keys) so deleting or
+-- changing a related user/course/class/enrollment cannot cascade into history.
 CREATE TABLE IF NOT EXISTS audit_log (
   audit_id    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   actor       VARCHAR(100)        NULL,   -- username or NULL for anonymous
-  action      VARCHAR(100)    NOT NULL,   -- e.g. LOGIN_SUCCESS, LOGIN_FAILURE, ATTENDANCE_EDIT
+  action      VARCHAR(100)    NOT NULL,   -- e.g. LOGIN_SUCCESS, LOGIN_FAILED, ATTENDANCE_CORRECTION
   target      VARCHAR(255)    NOT NULL,   -- e.g. users/42, attendance/17
   ip_address  VARCHAR(45)         NULL,   -- IPv4 or IPv6
   details     TEXT                NULL,   -- optional JSON/text detail

@@ -11,6 +11,7 @@
  */
 
 import axios from 'axios';
+import { assertSecureApiTransport } from './apiConfig';
 
 const API_BASE = '/api/auth';
 
@@ -27,9 +28,7 @@ let _token = null;
  */
 export async function login(username, password) {
   try {
-    if (process.env.NODE_ENV === 'production' && window.location.protocol !== 'https:') {
-      throw new Error('HTTPS is required to sign in.');
-    }
+    assertSecureApiTransport();
     const { data } = await axios.post(`${API_BASE}/login`, { username, password });
     _token = data.token;
     // Store in sessionStorage so the user stays logged in on refresh
@@ -40,7 +39,7 @@ export async function login(username, password) {
     sessionStorage.setItem('sam_full_name', data.fullName);
     return data;
   } catch (err) {
-    if (err.message === 'HTTPS is required to sign in.') throw err;
+    if (err.code === 'INSECURE_TRANSPORT') throw err;
     // Surface the server's message when available; fall back to a generic one.
     const serverMessage = err.response?.data?.message;
     throw new Error(serverMessage || 'Login failed. Please try again.');

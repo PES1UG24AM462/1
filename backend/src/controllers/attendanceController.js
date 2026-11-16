@@ -119,8 +119,7 @@ async function submitAttendance(req, res) {
 
   // ── Save attendance records ───────────────────────────────────────────────
   try {
-    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
-      || req.socket.remoteAddress || 'unknown';
+    const clientIp = req.socket?.remoteAddress || null;
     const result = await attendanceModel.saveAttendanceRecords({
       classId: parsedClassId,
       date,
