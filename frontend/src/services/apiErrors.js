@@ -2,7 +2,7 @@ export const SERVICE_UNAVAILABLE_MESSAGE = 'The service is temporarily unavailab
 
 /** Normalize transport and server failures while preserving useful 4xx messages. */
 export function normalizeApiError(error) {
-  if (!error || error.code === 'ERR_CANCELED') return error;
+  if (!error || error.code === 'ERR_CANCELED' || error.code === 'INSECURE_TRANSPORT') return error;
 
   const status = error.response?.status;
   const timedOut = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';

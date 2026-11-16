@@ -12,6 +12,8 @@
 require('dotenv').config();
 
 const http = require('http');
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -37,6 +39,15 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
+const isProduction = process.env.NODE_ENV === 'production';
+const trustedProxyIps = (process.env.TRUSTED_PROXY_IPS || '')
+  .split(',')
+  .map((ip) => ip.trim())
+  .filter(Boolean);
+
+// Forwarded protocol headers are trusted only from explicitly configured proxies.
+if (trustedProxyIps.length) app.set('trust proxy', trustedProxyIps);
+
 function positiveIntegerEnv(name, fallback, maximum) {
   const parsed = Number.parseInt(process.env[name], 10);
   return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
@@ -51,7 +62,19 @@ let shutdownPromise;
 // ─── Security middleware ────────────────────────────────────────────────────
 // Helmet sets secure HTTP headers (X-Content-Type-Options, HSTS, etc.)
 // This supports SAM-NF-003 / SAM-SR-001 (HTTPS/TLS enforcement at proxy level)
-app.use(helmet());
+app.use(helmet({ hsts: false }));
+
+// Do not redirect API requests: redirects can replay or expose sensitive POST bodies.
+// Reject before body parsing so credentials and other payloads are never processed.
+app.use((req, res, next) => {
+  if (isProduction && !req.secure) {
+    return res.status(426).json({ message: 'HTTPS is required.' });
+  }
+  if (isProduction && req.secure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  }
+  return next();
+});
 
 // SAM-NF-001: measure every request and gzip responses to keep payloads small
 app.use(requestId);
@@ -59,7 +82,23 @@ app.use(responseTime);
 app.use(compression());
 
 // CORS — restrict to the React dev server and production origin
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || (isProduction ? '' : 'http://localhost:3000'))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+if (isProduction && (!allowedOrigins.length || allowedOrigins.some((origin) => !origin.startsWith('https://')))) {
+  throw new Error('Production ALLOWED_ORIGINS must contain only HTTPS origins.');
+}
+if (isProduction && allowedOrigins.some((origin) => {
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol !== 'https:' || parsed.origin !== origin;
+  } catch (_err) {
+    return true;
+  }
+})) {
+  throw new Error('Each production ALLOWED_ORIGINS entry must be a valid HTTPS origin without a path.');
+}
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -73,7 +112,9 @@ app.use(
         callback(err);
       }
     },
-    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: false,
   })
 );
 
@@ -208,8 +249,27 @@ async function verifyDatabaseWithRetry({
 
 async function start() {
   validateStartupConfiguration();
+  const keyPath = process.env.TLS_KEY_PATH;
+  const certPath = process.env.TLS_CERT_PATH;
+  if (Boolean(keyPath) !== Boolean(certPath)) {
+    throw new Error('TLS_KEY_PATH and TLS_CERT_PATH must be configured together.');
+  }
+  if (isProduction && !keyPath && !trustedProxyIps.length) {
+    throw new Error('Production requires direct TLS certificate paths or explicitly trusted TLS proxy IPs.');
+  }
+
+  const tlsOptions = keyPath
+    ? {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+      minVersion: 'TLSv1.2',
+    }
+    : null;
+
   await verifyDatabaseWithRetry();
-  server = http.createServer(app);
+  server = tlsOptions
+    ? https.createServer(tlsOptions, app)
+    : http.createServer(app);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(PORT, resolve);
@@ -217,6 +277,7 @@ async function start() {
   logger.info('server.started', {
     port: server.address().port,
     environment: process.env.NODE_ENV || 'development',
+    transport: tlsOptions ? 'https' : 'http',
   });
   return server;
 }
