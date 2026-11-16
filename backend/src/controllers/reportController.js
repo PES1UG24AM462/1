@@ -9,6 +9,7 @@ const facultyModel = require('../models/facultyModel');
 const auditModel = require('../models/auditModel');
 const { attendanceThreshold } = require('../config/attendancePolicy');
 const { reportToCsv, csvFilename } = require('../utils/csvHelper');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 function parsePositiveId(value) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -21,7 +22,7 @@ async function getReportClasses(req, res) {
     const classes = await reportModel.listReportClasses(req.user.userId, req.user.role);
     return res.status(200).json({ classes });
   } catch (err) {
-    console.error('[Report] Class list query failed:', err.message);
+    logOperationalError('report.class_list_failed', err, res);
     return res.status(500).json({ message: 'Unable to load report classes. Please try again.' });
   }
 }
@@ -37,7 +38,7 @@ async function getReportStudents(req, res) {
     const students = await reportModel.listReportStudents(classId, req.user.userId, req.user.role);
     return res.status(200).json({ students });
   } catch (err) {
-    console.error('[Report] Student list query failed:', err.message);
+    logOperationalError('report.student_list_failed', err, res);
     return res.status(500).json({ message: 'Unable to load report students. Please try again.' });
   }
 }
@@ -91,7 +92,7 @@ async function getAttendanceReport(req, res) {
     });
     return res.status(200).json(report);
   } catch (err) {
-    console.error('[Report] Attendance report generation failed:', err.message);
+    logOperationalError('report.generation_failed', err, res);
     return res.status(500).json({ message: 'Unable to generate attendance report. Please try again.' });
   }
 }
@@ -117,7 +118,7 @@ async function getLowAttendanceReport(req, res) {
         return res.status(404).json({ message: 'Class not found or not assigned to you.' });
       }
     } catch (err) {
-      console.error('[Report] Class verification failed:', err.message);
+      logOperationalError('report.class_verification_failed', err, res);
       return res.status(500).json({ message: 'Unable to verify class assignment. Please try again.' });
     }
   }
@@ -143,7 +144,7 @@ async function getLowAttendanceReport(req, res) {
       students: flaggedStudents,
     });
   } catch (err) {
-    console.error('[Report] Low attendance query failed:', err.message);
+    logOperationalError('report.low_attendance_failed', err, res);
     return res.status(500).json({ message: 'Unable to generate low-attendance report. Please try again.' });
   }
 }
@@ -227,7 +228,7 @@ async function exportAttendanceCsv(req, res) {
     return res.status(200).send('\uFEFF' + csv);
 
   } catch (err) {
-    console.error('[Report] CSV export failed:', err.message);
+    logOperationalError('report.csv_export_failed', err, res);
     return res.status(500).json({ message: 'Unable to export CSV. Please try again.' });
   }
 }

@@ -136,6 +136,9 @@ production responses. The local CRA proxy remains HTTP for development only.
 | SAM-F-004 | Display current enrolled roster for the selected assigned class (TC-ATT-01) | ✅ Implemented |
 | SAM-F-008 | Students view their own persisted attendance history by course and date (TC-STU-01; AC-SAM-F-008) | Implemented |
 | SAM-F-007 | Authorized faculty corrects an existing attendance row; correction is timestamped (TC-ATT-04) | Implemented |
+| SAM-NF-002 | 99.5% monthly availability excluding scheduled maintenance (AC-SAM-NF-002; TC-OPS-01) | Health/readiness checks and calculation helper implemented; production uptime requires external monitoring evidence |
+
+Availability measurement and the operational dependencies for SAM-NF-002 are documented in [docs/availability.md](docs/availability.md).
 
 ---
 

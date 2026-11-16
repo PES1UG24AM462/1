@@ -17,6 +17,7 @@ const userModel = require('../models/userModel');
 const auditModel = require('../models/auditModel');
 const { generateToken } = require('../utils/jwtHelper');
 const { verifyPassword } = require('../utils/passwordHelper');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 /**
  * Login handler.
@@ -110,7 +111,7 @@ async function login(req, res) {
     });
   } catch (err) {
     // Unexpected server error — do not leak internal details to the client
-    console.error('[Auth] Unexpected login error:', err.message);
+    logOperationalError('auth.login_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }

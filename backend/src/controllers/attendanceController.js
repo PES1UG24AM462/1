@@ -17,6 +17,7 @@
  */
 
 const attendanceModel = require('../models/attendanceModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 const facultyModel = require('../models/facultyModel');
 const { isValidAttendanceDate } = require('./facultyController');
 
@@ -112,7 +113,7 @@ async function submitAttendance(req, res) {
       }
     }
   } catch (err) {
-    console.error('[Attendance] Class verification failed:', err.message);
+    logOperationalError('attendance.class_verification_failed', err, res);
     return res.status(500).json({ message: 'Unable to verify class assignment. Please try again.' });
   }
 
@@ -142,7 +143,7 @@ async function submitAttendance(req, res) {
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Duplicate attendance record detected for this session.' });
     }
-    console.error('[Attendance] Save failed:', err.message);
+    logOperationalError('attendance.save_failed', err, res);
     return res.status(500).json({ message: 'Unable to save attendance. Please try again.' });
   }
 }
@@ -178,7 +179,7 @@ async function getSessionAttendance(req, res) {
     const existing = await attendanceModel.getAttendanceForSession(parsedClassId, date);
     return res.status(200).json({ attendance: existing });
   } catch (err) {
-    console.error('[Attendance] Fetch failed:', err.message);
+    logOperationalError('attendance.fetch_failed', err, res);
     return res.status(500).json({ message: 'Unable to load attendance. Please try again.' });
   }
 }

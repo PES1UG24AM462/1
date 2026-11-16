@@ -1,4 +1,5 @@
 const studentModel = require('../models/studentModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 function parsePositiveId(value) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -20,7 +21,7 @@ async function getEnrolledCourses(req, res) {
     const courses = await studentModel.listEnrolledCourses(req.user.userId);
     return res.status(200).json({ courses });
   } catch (err) {
-    console.error('[Student] Enrolled course lookup failed:', err.message);
+    logOperationalError('student.enrolled_courses_failed', err, res);
     return res.status(500).json({ message: 'Unable to load your courses. Please try again.' });
   }
 }
@@ -46,7 +47,7 @@ async function getAttendanceHistory(req, res) {
     );
     return res.status(200).json({ records });
   } catch (err) {
-    console.error('[Student] Attendance history lookup failed:', err.message);
+    logOperationalError('student.attendance_history_failed', err, res);
     return res.status(500).json({ message: 'Unable to load attendance history. Please try again.' });
   }
 }

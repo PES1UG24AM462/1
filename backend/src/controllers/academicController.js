@@ -5,6 +5,7 @@
 
 const academicModel = require('../models/academicModel');
 const auditModel = require('../models/auditModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 function parseId(value) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -108,7 +109,7 @@ function handleDatabaseError(err, res, label) {
   if (['ER_NO_REFERENCED_ROW_2', 'ER_ROW_IS_REFERENCED_2'].includes(err?.code)) {
     return res.status(400).json({ message: 'The selected course, class, student, or faculty record is invalid.' });
   }
-  console.error(`[Academic] ${label} failed:`, err?.message);
+  logOperationalError('academic.database_operation_failed', err, res, { operation: label });
   return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
 }
 

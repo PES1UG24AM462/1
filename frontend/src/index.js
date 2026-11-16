@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
+import './services/apiConfig';
 import App from './App';
+import './styles/global.css';
 
 // Block all API calls from an accidentally HTTP-hosted production page.
 axios.interceptors.request.use((config) => {

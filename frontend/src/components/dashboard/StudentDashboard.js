@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import * as studentService from '../../services/studentService';
 import { isValidAttendanceDate } from '../../utils/attendanceDate';
+import DashboardSummary from './DashboardSummary';
 import './StudentDashboard.css';
 
 // Threshold below which the percentage chip turns red (SAM-F-010 uses this too)
@@ -147,6 +148,9 @@ function StudentDashboard() {
         </div>
         <button className="student-signout" type="button" onClick={handleLogout}>Sign out</button>
       </header>
+
+      {/* ── SAM-F-017: Attendance Summary ─────────────────────────────── */}
+      <DashboardSummary />
 
       {/* ── SAM-F-009: Attendance Percentage Section ───────────────────── */}
       <section className="student-card" aria-labelledby="pct-title">

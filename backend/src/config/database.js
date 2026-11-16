@@ -5,6 +5,20 @@
  */
 
 const mysql = require('mysql2/promise');
+const logger = require('../utils/logger');
+
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const connectionLimit = positiveInteger(process.env.DB_POOL_LIMIT, 10);
+const queueLimit = positiveInteger(process.env.DB_QUEUE_LIMIT, 50);
+const connectTimeoutMs = positiveInteger(process.env.DB_CONNECT_TIMEOUT_MS, 3000);
+const queryTimeoutMs = positiveInteger(
+  process.env.DB_PROBE_TIMEOUT_MS || process.env.DB_QUERY_TIMEOUT_MS,
+  3000
+);
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -13,25 +27,45 @@ const pool = mysql.createPool({
   user: process.env.DB_USER || 'sam_user',
   password: process.env.DB_PASSWORD,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  connectionLimit,
+  // Bound queued requests so a stalled database cannot grow memory without limit.
+  queueLimit,
+  connectTimeout: connectTimeoutMs,
   // Enable timezone-aware timestamps
   timezone: '+00:00',
 });
 
-/**
- * Test the database connection on startup.
- * Logs success or exits process on failure.
- */
-async function testConnection() {
+/** Run a bounded, read-only database probe used by startup and readiness. */
+async function checkDatabaseConnectivity() {
   try {
-    const connection = await pool.getConnection();
-    console.log('[DB] MySQL connection pool established successfully.');
-    connection.release();
+    // SELECT 1 is safe to retry. The driver timeout turns a stalled probe into
+    // a failure response without exposing its connection details to the caller.
+    await pool.query({ sql: 'SELECT 1', timeout: queryTimeoutMs });
   } catch (err) {
-    console.error('[DB] Failed to connect to MySQL:', err.message);
-    process.exit(1);
+    logger.warn('database.connectivity_check_failed', {
+      errorCode: err.code || 'UNKNOWN',
+    });
+    throw err;
   }
 }
 
-module.exports = { pool, testConnection };
+/**
+ * Test the database connection on startup.
+ * Connection recovery/retry policy is owned by server startup, not this layer.
+ */
+async function testConnection() {
+  await checkDatabaseConnectivity();
+  logger.info('database.connected');
+}
+
+async function closeDatabase() {
+  await pool.end();
+}
+
+module.exports = {
+  pool,
+  testConnection,
+  checkDatabaseConnectivity,
+  closeDatabase,
+  queryTimeoutMs,
+};

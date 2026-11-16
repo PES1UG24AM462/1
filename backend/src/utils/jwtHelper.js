@@ -9,12 +9,14 @@
 
 const jwt = require('jsonwebtoken');
 
-const SECRET = process.env.JWT_SECRET;
-const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
-
-if (!SECRET || SECRET.length < 32) {
-  console.error('[JWT] JWT_SECRET is missing or too short. Set a strong secret in .env');
-  process.exit(1);
+function getSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    const err = new Error('JWT_SECRET must be set to at least 32 characters before authentication is used.');
+    err.code = 'INVALID_JWT_CONFIGURATION';
+    throw err;
+  }
+  return secret;
 }
 
 /**
@@ -24,9 +26,9 @@ if (!SECRET || SECRET.length < 32) {
  * @returns {string}         - signed JWT string
  */
 function generateToken(payload) {
-  return jwt.sign(payload, SECRET, {
+  return jwt.sign(payload, getSecret(), {
     algorithm: 'HS256',
-    expiresIn: EXPIRES_IN,
+    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
     issuer: 'sams-api',
   });
 }
@@ -39,7 +41,7 @@ function generateToken(payload) {
  * @throws {JsonWebTokenError | TokenExpiredError}
  */
 function verifyToken(token) {
-  return jwt.verify(token, SECRET, { algorithms: ['HS256'], issuer: 'sams-api' });
+  return jwt.verify(token, getSecret(), { algorithms: ['HS256'], issuer: 'sams-api' });
 }
 
 module.exports = { generateToken, verifyToken };

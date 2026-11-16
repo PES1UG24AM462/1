@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   edited_at       DATETIME         NULL,
   PRIMARY KEY (attendance_id),
   UNIQUE KEY uq_attendance (student_id, class_id, attendance_date),  -- SAM-F-006
+  INDEX idx_att_class_date (class_id, attendance_date),               -- SAM-NF-001: roster/report lookups
   CONSTRAINT fk_att_student    FOREIGN KEY (student_id)  REFERENCES students (student_id),
   CONSTRAINT fk_att_class      FOREIGN KEY (class_id)    REFERENCES classes  (class_id),
   CONSTRAINT fk_att_recorded   FOREIGN KEY (recorded_by) REFERENCES users    (user_id),

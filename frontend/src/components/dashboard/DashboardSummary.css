@@ -1,0 +1,212 @@
+/* ============================================================
+   DashboardSummary.css
+   SAM-F-017 — Attendance summaries on the dashboard.
+   ============================================================ */
+
+.ds-container {
+  margin-bottom: 1.5rem;
+}
+
+/* ── Section ── */
+.ds-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ds-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 1.25rem;
+}
+
+.ds-today-date {
+  font-weight: 400;
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+/* ── Stat grid ── */
+.ds-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.ds-stat-card {
+  background: #f7fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  text-align: center;
+}
+.ds-stat-card--ok  { border-color: #9ae6b4; background: #f0fff4; }
+.ds-stat-card--low { border-color: #fc8181; background: #fff5f5; }
+.ds-stat-card--warn{ border-color: #f6e05e; background: #fffff0; }
+
+.ds-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 0.2rem;
+  line-height: 1;
+}
+.ds-stat-label {
+  font-size: 0.78rem;
+  color: #718096;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0;
+}
+.ds-stat-sub {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  margin: 0.2rem 0 0;
+}
+
+/* ── Progress bar ── */
+.ds-progress-wrap {
+  margin-bottom: 1.25rem;
+}
+.ds-progress-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+.ds-progress-fill {
+  background: #48bb78;
+  border-radius: 999px;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.ds-progress-fill--low { background: #f56565; }
+.ds-progress-label {
+  font-size: 0.8rem;
+  color: #718096;
+}
+
+/* ── Recent section ── */
+.ds-recent {
+  margin-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+.ds-recent-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #4a5568;
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Audit list (admin) ── */
+.ds-audit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.ds-audit-item {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr 2fr 1.5fr;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #4a5568;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f0f4f8;
+}
+.ds-audit-action { font-weight: 700; color: #2d3748; }
+.ds-audit-actor  { color: #2b6cb0; }
+.ds-audit-target { color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-audit-time   { color: #a0aec0; font-size: 0.75rem; white-space: nowrap; }
+
+/* ── Session cards (faculty) ── */
+.ds-sessions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+.ds-session-card {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.ds-session-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.ds-session-section {
+  background: #ebf4ff;
+  color: #2b6cb0;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+}
+.ds-session-date {
+  color: #a0aec0;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.ds-session-stats {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* ── Badges ── */
+.ds-badge {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+}
+.ds-badge--present { background: #c6f6d5; color: #22543d; }
+.ds-badge--late    { background: #fefcbf; color: #744210; }
+.ds-badge--absent  { background: #fed7d7; color: #742a2a; }
+
+/* ── Loading / error states ── */
+.ds-loading {
+  color: #718096;
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}
+.ds-error {
+  background: #fff5f5;
+  border: 1px solid #fc8181;
+  border-radius: 8px;
+  color: #c53030;
+  padding: 0.9rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+.ds-retry-btn {
+  background: none;
+  border: 1px solid #fc8181;
+  border-radius: 5px;
+  color: #c53030;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.7rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .ds-stat-grid       { grid-template-columns: repeat(2, 1fr); }
+  .ds-audit-item      { grid-template-columns: 1fr 1fr; }
+  .ds-audit-target,
+  .ds-audit-time      { display: none; }
+}

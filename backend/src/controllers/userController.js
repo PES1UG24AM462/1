@@ -14,7 +14,7 @@
 const bcrypt = require('bcryptjs');
 const validator = require('validator');
 const userModel = require('../models/userModel');
-const auditModel = require('../models/auditModel');
+const { logOperationalError } = require('../utils/logOperationalError');
 
 const ROLES = ['student', 'faculty', 'admin'];
 const BCRYPT_COST = 12;
@@ -39,7 +39,7 @@ async function listUsers(_req, res) {
     const users = await userModel.listUsers();
     return res.status(200).json({ users });
   } catch (err) {
-    console.error('[Users] list failed:', err.message);
+    logOperationalError('users.list_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }
@@ -83,20 +83,24 @@ async function createUser(req, res) {
       usn: role === 'student' ? usn : null,
       department,
       semester: role === 'student' ? semester : null,
-    });
-    await auditModel.logEvent({
-      actor: req.user.username,
-      action: 'USER_CREATED',
-      target: `users/${userId}`,
-      ipAddress: clientIp(req),
-      details: JSON.stringify({ username, role }),
+      auditEvent: {
+        actor: req.user.username,
+        action: 'USER_CREATED',
+        target: 'users/pending',
+        ipAddress: clientIp(req),
+        details: JSON.stringify({
+          username, role, fullName, email,
+          ...(role === 'student' && { usn, department, semester }),
+          ...(role === 'faculty' && { department }),
+        }),
+      },
     });
     return res.status(201).json({ userId, username, role, fullName });
   } catch (err) {
     if (err && err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'That username or USN already exists.' });
     }
-    console.error('[Users] create failed:', err.message);
+    logOperationalError('users.create_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }
@@ -149,17 +153,17 @@ async function updateUser(req, res) {
       changes.passwordHash = await bcrypt.hash(req.body.password, BCRYPT_COST);
       changed.push('passwordReset');
     }
-    await userModel.updateUser(userId, changes);
-    await auditModel.logEvent({
+    const updated = await userModel.updateUser(userId, changes, {
       actor: req.user.username,
-      action: 'USER_UPDATED',
-      target: `users/${userId}`,
       ipAddress: clientIp(req),
-      details: JSON.stringify({ changed }),
+      changed,
+      changes,
+      passwordReset: req.body.password !== undefined,
     });
+    if (!updated) return res.status(404).json({ message: 'User not found.' });
     return res.status(200).json({ message: 'Account updated.', userId, changed });
   } catch (err) {
-    console.error('[Users] update failed:', err.message);
+    logOperationalError('users.update_failed', err, res);
     return res.status(500).json({ message: 'An internal server error occurred. Please try again.' });
   }
 }
