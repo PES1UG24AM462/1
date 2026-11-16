@@ -150,7 +150,7 @@ recording the criterion as verified.
 |--------|------------|--------|
 | SAM-F-001 | Authenticate users with username + password | ✅ Implemented |
 | SAM-SR-002 | Passwords stored as salted bcrypt hash | ✅ Implemented |
-| SAM-SR-004 | Login success/failure recorded in audit log | ✅ Implemented |
+| SAM-SR-004 | Failed login attempts, attendance corrections, and administrative changes are audited (AC-SAM-SR-004; TC-AUD-01) | Implemented; see [docs/security-audit.md](docs/security-audit.md) |
 | SAM-SR-001 | The system shall enforce HTTPS/TLS for all authenticated network communication. | Application enforcement implemented; deployment scan pending |
 | SAM-NF-003 | Use HTTPS/TLS for authenticated traffic. | Application enforcement implemented; deployment scan pending |
 | SAM-F-002 | RBAC middleware for protected routes | ✅ Implemented |
@@ -162,6 +162,8 @@ recording the criterion as verified.
 | SAM-NF-006 | Retain audit records for at least one academic year or configured institutional period (TC-AUD-02) | Append-only database guards; automatic deletion disabled pending confirmation of institutional policy |
 
 Availability measurement and the operational dependencies for SAM-NF-002 are documented in [docs/availability.md](docs/availability.md).
+
+Security-relevant login, attendance-correction, and administrative audit behavior for SAM-SR-004 / TC-AUD-01 is documented in [docs/security-audit.md](docs/security-audit.md). The source SRS PDF and issue #39 differ on the printed requirement number; see the traceability note in that document.
 
 ---
 

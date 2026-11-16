@@ -20,7 +20,7 @@ const ROLES = ['student', 'faculty', 'admin'];
 const BCRYPT_COST = 12;
 
 function clientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  return req.socket?.remoteAddress || null;
 }
 
 function str(v) {
@@ -88,11 +88,9 @@ async function createUser(req, res) {
         action: 'USER_CREATED',
         target: 'users/pending',
         ipAddress: clientIp(req),
-        details: JSON.stringify({
-          username, role, fullName, email,
-          ...(role === 'student' && { usn, department, semester }),
-          ...(role === 'faculty' && { department }),
-        }),
+        // The target is replaced with the generated user ID in userModel.
+        // Keep personal profile fields and secrets out of the audit payload.
+        details: JSON.stringify({ role }),
       },
     });
     return res.status(201).json({ userId, username, role, fullName });
@@ -157,7 +155,6 @@ async function updateUser(req, res) {
       actor: req.user.username,
       ipAddress: clientIp(req),
       changed,
-      changes,
       passwordReset: req.body.password !== undefined,
     });
     if (!updated) return res.status(404).json({ message: 'User not found.' });
